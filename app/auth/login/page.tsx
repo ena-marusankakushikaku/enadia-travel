@@ -1,119 +1,109 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Chrome, LogOut, Mail } from 'lucide-react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
+
+type DemoUser = {
+  email: string;
+};
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { loading, logout, user } = useCurrentUser();
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [user, setUser] = useState<DemoUser | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // すでにログインしている場合は、メインのマイページや旅一覧へ自動遷移
-  useEffect(() => {
-    if (!loading && user) {
-      router.push('/trips'); 
-    }
-  }, [user, loading, router]);
+  const handleEmailLogin = async () => {
+    setLoading(true);
 
-  async function signInWithGoogle() {
-    setSubmitting(true);
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/trips`
-      }
-    });
-    if (error) {
-      setMessage(error.message);
-      setSubmitting(false);
+    try {
+      // Supabase Auth 接続前の一時モック。
+      // 第4弾で signInWithOtp / OAuth に差し替える。
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setUser({ email: 'demo@enadia.travel' });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  async function signInWithEmail() {
-    if (!email) {
-      setMessage('メールアドレスを入力してください。');
-      return;
-    }
-    setSubmitting(true);
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/trips`
-      }
-    });
-    setSubmitting(false);
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage('ログイン用のマジックリンクをメールで送信しました。確認してください。');
-    }
-  }
+  const handleGoogleLogin = async () => {
+    setLoading(true);
 
-  if (loading) {
-    return (
-      <AppShell title="読み込み中...">
-        <div className="text-center py-8 text-enadia-muted">アカウント状態を確認しています...</div>
-      </AppShell>
-    );
-  }
+    try {
+      // Supabase OAuth 接続前の一時モック。
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setUser({ email: 'google-user@enadia.travel' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setUser(null);
+  };
 
   return (
     <AppShell subtitle="アカウント" title={user ? 'ログイン済み' : 'ログイン'}>
       <section className="mx-auto max-w-xs space-y-4 py-8">
         {user ? (
           <>
-            <p className="text-sm text-center text-enadia-ink mb-4">
-              {user.email} としてログインしています。
-            </p>
-            <Button onClick={() => router.push('/trips')} className="w-full" variant="dark">
-              旅一覧へ
-            </Button>
-            <Button icon={<LogOut className=\"h-4 w-4\" aria-hidden=\"true\" />} onClick={logout} variant=\"secondary\" className=\"w-full\">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-sm font-semibold text-slate-900">
+                ログイン中
+              </p>
+              <p className="mt-1 break-all text-xs text-slate-500">
+                {user.email}
+              </p>
+            </div>
+
+            <Button variant="secondary" onClick={handleLogout} className="w-full">
               ログアウト
             </Button>
+
+            <Link
+              href="/trips"
+              className="block rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white"
+            >
+              マイトリップへ戻る
+            </Link>
           </>
         ) : (
           <>
-            <Button
-              className="w-full"
-              disabled={submitting}
-              icon={<Chrome className="h-4 w-4" aria-hidden="true" />}
-              loading={submitting}
-              onClick={signInWithGoogle}
-              variant="dark"
-            >
-              Googleでログイン
-            </Button>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-enadia-ink">Magic link</label>\n              <input
-                className="h-11 w-full rounded-lg border border-enadia-line px-3"
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                type="email"
-                value={email}
-              />
-              <Button
-                className="w-full"
-                icon={<Mail className="h-4 w-4" aria-hidden="true" />}
-                loading={submitting}
-                onClick={signInWithEmail}
-                variant="secondary"
-              >
-                メールでログイン
-              </Button>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-sm font-semibold text-slate-900">
+                ENADIA Travelにログイン
+              </p>
+              <p className="mt-2 text-xs leading-6 text-slate-500">
+                旅の写真、テーマログ、全国制覇の記録を保存するにはログインが必要です。
+              </p>
             </div>
+
+            <Button
+              variant="primary"
+              onClick={handleGoogleLogin}
+              loading={loading}
+              className="w-full"
+            >
+              Googleで続行
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={handleEmailLogin}
+              loading={loading}
+              className="w-full"
+            >
+              メールで続行
+            </Button>
+
+            <Link
+              href="/trips"
+              className="block text-center text-xs font-medium text-slate-500 underline"
+            >
+              いまはログインせずに見る
+            </Link>
           </>
         )}
-        {message ? <p className="rounded-lg bg-slate-50 p-3 text-sm text-enadia-muted">{message}</p> : null}
       </section>
     </AppShell>
   );
