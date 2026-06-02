@@ -69,9 +69,14 @@ export default function ConquestPage() {
           )}
         </section>
       </div>
-      <PrefectureDetailSheet
-        entries={conquestEntries}
-        onClose={() => setSelectedPrefectureId(null)}
+     <PrefectureDetailSheet
+  entries={conquestEntries}
+  projects={conquestProjects}
+  photos={allPhotos}
+  users={users}
+  onClose={() => setSelectedPrefectureId(null)}
+  prefectureId={selectedPrefectureId}
+/>
         prefectureId={selectedPrefectureId}
       />
     </AppShell>
