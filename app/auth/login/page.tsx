@@ -1,46 +1,70 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
-
-type DemoUser = {
-  email: string;
-};
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function LoginPage() {
-  const [user, setUser] = useState<DemoUser | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { user, loading: userLoading, logout } = useCurrentUser();
+  const supabase = createSupabaseBrowserClient();
+
+  const [email, setEmail] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [next, setNext] = useState('/trips');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNext(params.get('next') ?? '/trips');
+  }, []);
 
   const handleEmailLogin = async () => {
-    setLoading(true);
-
-    try {
-      // Supabase Auth 接続前の一時モック。
-      // 第4弾で signInWithOtp / OAuth に差し替える。
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setUser({ email: 'demo@enadia.travel' });
-    } finally {
-      setLoading(false);
+    if (!email) {
+      setError('メールアドレスを入力してください');
+      return;
     }
+
+    setSubmitting(true);
+    setError(null);
+
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+      }
+    });
+
+    if (otpError) {
+      setError(otpError.message);
+    } else {
+      setOtpSent(true);
+    }
+
+    setSubmitting(false);
   };
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
+    setSubmitting(true);
+    setError(null);
 
-    try {
-      // Supabase OAuth 接続前の一時モック。
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setUser({ email: 'google-user@enadia.travel' });
-    } finally {
-      setLoading(false);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+      }
+    });
+
+    if (oauthError) {
+      setError(oauthError.message);
+      setSubmitting(false);
     }
   };
 
-  const handleLogout = async () => {
-    setUser(null);
-  };
+  const loading = userLoading || submitting;
 
   return (
     <AppShell subtitle="アカウント" title={user ? 'ログイン済み' : 'ログイン'}>
@@ -56,7 +80,7 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <Button variant="secondary" onClick={handleLogout} className="w-full">
+            <Button variant="secondary" onClick={logout} loading={userLoading} className="w-full">
               ログアウト
             </Button>
 
@@ -67,6 +91,13 @@ export default function LoginPage() {
               マイトリップへ戻る
             </Link>
           </>
+        ) : otpSent ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-sm font-semibold text-slate-900">確認メールを送信しました</p>
+            <p className="mt-2 text-xs leading-6 text-slate-500">
+              {email} 宛にログイン用のリンクを送信しました。メール内のリンクからログインしてください。
+            </p>
+          </div>
         ) : (
           <>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -87,14 +118,25 @@ export default function LoginPage() {
               Googleで続行
             </Button>
 
-            <Button
-              variant="secondary"
-              onClick={handleEmailLogin}
-              loading={loading}
-              className="w-full"
-            >
-              メールで続行
-            </Button>
+            <div className="space-y-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="メールアドレス"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+              <Button
+                variant="secondary"
+                onClick={handleEmailLogin}
+                loading={loading}
+                className="w-full"
+              >
+                メールで続行
+              </Button>
+            </div>
+
+            {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
 
             <Link
               href="/trips"
