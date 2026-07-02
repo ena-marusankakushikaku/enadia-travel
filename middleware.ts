@@ -6,11 +6,21 @@ const protectedPrefixes = ['/trips', '/profile', '/conquest', '/travel-log'];
 
 export async function middleware(request: NextRequest) {
   const shouldProtect = protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix));
+
+  if (!shouldProtect) {
+    return NextResponse.next();
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!shouldProtect || !supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.next();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Supabase isn't configured, so we can't verify the session. Fail closed
+    // rather than letting requests to protected paths through unauthenticated.
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/auth/login';
+    redirectUrl.searchParams.set('next', request.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
   let response = NextResponse.next({ request });
