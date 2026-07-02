@@ -1,70 +1,90 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { getSafeRedirectPath } from '@/lib/safe-redirect';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
+function LoginLoading() {
+  return (
+    <AppShell subtitle="アカウント" title="ログイン">
+      <div className="py-10 text-center text-sm text-enadia-muted">読み込み中...</div>
+    </AppShell>
+  );
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const { user, loading: userLoading, logout } = useCurrentUser();
-  const supabase = createSupabaseBrowserClient();
+  const searchParams = useSearchParams();
+  const next = getSafeRedirectPath(searchParams.get('next'));
 
   const [email, setEmail] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [next, setNext] = useState('/trips');
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setNext(params.get('next') ?? '/trips');
-  }, []);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const handleEmailLogin = async () => {
-    if (!email) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setError('メールアドレスを入力してください');
       return;
     }
 
-    setSubmitting(true);
     setError(null);
+    setLoading(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+        }
+      });
 
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+      if (signInError) {
+        setError(signInError.message);
+      } else {
+        setMagicLinkSent(true);
       }
-    });
-
-    if (otpError) {
-      setError(otpError.message);
-    } else {
-      setOtpSent(true);
+    } finally {
+      setLoading(false);
     }
-
-    setSubmitting(false);
   };
 
   const handleGoogleLogin = async () => {
-    setSubmitting(true);
     setError(null);
-
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+    setLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
       }
     });
 
-    if (oauthError) {
-      setError(oauthError.message);
-      setSubmitting(false);
+    if (signInError) {
+      setError(signInError.message);
+      setLoading(false);
     }
+    // On success the browser navigates to Google, so no further local state change is needed.
   };
 
-  const loading = userLoading || submitting;
+  if (userLoading) {
+    return <LoginLoading />;
+  }
 
   return (
     <AppShell subtitle="アカウント" title={user ? 'ログイン済み' : 'ログイン'}>
@@ -72,78 +92,67 @@ export default function LoginPage() {
         {user ? (
           <>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-slate-900">
-                ログイン中
-              </p>
-              <p className="mt-1 break-all text-xs text-slate-500">
-                {user.email}
-              </p>
+              <p className="text-sm font-semibold text-slate-900">ログイン中</p>
+              <p className="mt-1 break-all text-xs text-slate-500">{user.email}</p>
             </div>
 
-            <Button variant="secondary" onClick={logout} loading={userLoading} className="w-full">
+            <Button variant="secondary" onClick={logout} className="w-full">
               ログアウト
             </Button>
 
-            <Link
-              href="/trips"
-              className="block rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white"
-            >
+            <Link href={next} className="block rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white">
               マイトリップへ戻る
             </Link>
           </>
-        ) : otpSent ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-slate-900">確認メールを送信しました</p>
-            <p className="mt-2 text-xs leading-6 text-slate-500">
-              {email} 宛にログイン用のリンクを送信しました。メール内のリンクからログインしてください。
-            </p>
-          </div>
         ) : (
           <>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-slate-900">
-                ENADIA Travelにログイン
-              </p>
+              <p className="text-sm font-semibold text-slate-900">ENADIA Travelにログイン</p>
               <p className="mt-2 text-xs leading-6 text-slate-500">
                 旅の写真、テーマログ、全国制覇の記録を保存するにはログインが必要です。
               </p>
             </div>
 
-            <Button
-              variant="primary"
-              onClick={handleGoogleLogin}
-              loading={loading}
-              className="w-full"
-            >
+            {error ? (
+              <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{error}</span>
+              </div>
+            ) : null}
+
+            <Button variant="primary" onClick={handleGoogleLogin} loading={loading} className="w-full">
               Googleで続行
             </Button>
 
-            <div className="space-y-2">
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="メールアドレス"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-              <Button
-                variant="secondary"
-                onClick={handleEmailLogin}
-                loading={loading}
-                className="w-full"
-              >
-                メールで続行
-              </Button>
-            </div>
+            {magicLinkSent ? (
+              <div className="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs text-enadia-primary">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{email} 宛にログイン用リンクを送信しました。メール内のリンクを開いてログインを完了してください。</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  or
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
 
-            {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
+                <label className="block text-left">
+                  <span className="text-xs font-semibold text-slate-600">メールアドレス</span>
+                  <input
+                    className="mt-1 h-11 w-full rounded-lg border border-enadia-line bg-white px-3 text-sm outline-none focus:border-enadia-primary focus:ring-2 focus:ring-teal-100"
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    type="email"
+                    value={email}
+                  />
+                </label>
 
-            <Link
-              href="/trips"
-              className="block text-center text-xs font-medium text-slate-500 underline"
-            >
-              いまはログインせずに見る
-            </Link>
+                <Button variant="secondary" onClick={handleEmailLogin} loading={loading} className="w-full">
+                  メールで続行
+                </Button>
+              </>
+            )}
           </>
         )}
       </section>

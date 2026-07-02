@@ -113,6 +113,38 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['photos']['Insert']>;
         Relationships: [];
       };
+      profiles: {
+        Row: {
+          id: string;
+          display_name: string;
+          avatar_url: string | null;
+          language: string | null;
+          country_code: string | null;
+          email: string | null;
+          stripe_customer_id: string | null;
+          plan: string;
+          points: number;
+          last_login_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          display_name?: string;
+          avatar_url?: string | null;
+          language?: string | null;
+          country_code?: string | null;
+          email?: string | null;
+          stripe_customer_id?: string | null;
+          plan?: string;
+          points?: number;
+          last_login_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Relationships: [];
+      };
       trips: {
         Row: {
           id: string;
