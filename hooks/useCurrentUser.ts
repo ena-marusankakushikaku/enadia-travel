@@ -2,15 +2,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
 export function useCurrentUser() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const supabase = createSupabaseBrowserClient();
+  const [supabase] = useState(() => createSupabaseBrowserClient());
 
   useEffect(() => {
     // 現在のログインユーザーを取得
@@ -33,9 +31,9 @@ export function useCurrentUser() {
   const logout = async () => {
     setLoading(true);
     await supabase.auth.signOut();
-    router.push('/auth/login');
-    router.refresh();
-    setLoading(false);
+    // Hard navigation so no stale client state (or the user object held by
+    // this hook's callers) can outlive the cleared session.
+    window.location.assign('/auth/login');
   };
 
   return { user, loading, logout };
