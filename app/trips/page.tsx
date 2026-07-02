@@ -1,34 +1,64 @@
-'use client';
-
-import { useMemo, useState } from 'react';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Gift, Flame, Plus, Sparkles } from 'lucide-react';
+import { Gift, Plus } from 'lucide-react';
 import { AppShell } from '@/components/common/AppShell';
-import { TripCard } from '@/components/trips/TripCard';
-import {
-  mockCurrentUserId,
-  mockPhotos,
-  mockTripMembers,
-  mockTrips,
-  mockUsers,
-  mockUserStats
-} from '@/constants/mockData';
-import { getTripRole } from '@/lib/permissions';
+import { TripListClient, type TripListItem } from '@/components/trips/TripListClient';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { mapTripRow } from '@/lib/api/trips';
+import { mapTripMemberRow } from '@/lib/api/tripMembers';
+import { mapPhotoRow } from '@/lib/api/photos';
+import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
+import type { UserProfile } from '@/types/app';
 
-export default function TripsPage() {
-  const [hiddenTripIds, setHiddenTripIds] = useState<string[]>([]);
+export default async function TripsPage() {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-  const currentUser = mockUsers.find((user) => user.id === mockCurrentUserId);
-  const currentStats = mockUserStats.find((stats) => stats.userId === mockCurrentUserId);
-  const visibleTrips = useMemo(
-    () =>
-      mockTrips.filter(
-        (trip) =>
-          !hiddenTripIds.includes(trip.id) &&
-          getTripRole(trip.id, mockCurrentUserId, mockTripMembers)
-      ),
-    [hiddenTripIds]
+  if (!user) {
+    redirect('/auth/login');
+  }
+
+  const [{ data: tripRows }, { data: memberRows }, { data: photoRows }, { data: ownProfileRow }] = await Promise.all([
+    supabase.from('trips').select('*').order('created_at', { ascending: false }),
+    supabase.from('trip_members').select('*'),
+    supabase.from('photos').select('*'),
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+  ]);
+
+  const trips = (tripRows ?? []).map((row) =>
+    mapTripRow(
+      row,
+      (memberRows ?? []).filter((member) => member.trip_id === row.id).map((member) => member.user_id)
+    )
   );
+  const members = (memberRows ?? []).map(mapTripMemberRow);
+  const photos = (photoRows ?? []).map(mapPhotoRow);
+
+  const memberUserIds = Array.from(new Set(members.map((member) => member.userId)));
+  const { data: publicProfileRows } = memberUserIds.length
+    ? await supabase.from('public_profiles').select('*').in('id', memberUserIds)
+    : { data: [] };
+
+  const usersById = new Map<string, UserProfile>((publicProfileRows ?? []).map((row) => [row.id, mapPublicProfileRow(row)]));
+  const currentUser = ownProfileRow
+    ? mapProfileRow(ownProfileRow)
+    : { id: user.id, displayName: user.email ?? 'Traveler', avatarUrl: null, plan: 'free' as const, homePrefectureId: null };
+  usersById.set(currentUser.id, currentUser);
+  const users = Array.from(usersById.values());
+
+  const currentStats = {
+    points: ownProfileRow?.points ?? 0,
+    // Login streak isn't tracked in the DB yet; falls back to 0 until that's built.
+    loginStreakDays: 0
+  };
+
+  const items: TripListItem[] = trips.map((trip) => ({
+    trip,
+    members: members.filter((member) => member.tripId === trip.id),
+    photos: photos.filter((photo) => photo.tripId === trip.id)
+  }));
 
   return (
     <AppShell subtitle="旅管理MVP" title="旅一覧">
@@ -39,15 +69,15 @@ export default function TripsPage() {
           <div className="mt-5 grid grid-cols-3 gap-2">
             <div className="rounded-lg bg-white/10 p-3">
               <p className="text-[11px] text-white/62">Plan</p>
-              <p className="mt-1 text-sm font-bold uppercase">{currentUser?.plan ?? 'free'}</p>
+              <p className="mt-1 text-sm font-bold uppercase">{currentUser.plan}</p>
             </div>
             <div className="rounded-lg bg-white/10 p-3">
               <p className="text-[11px] text-white/62">Points</p>
-              <p className="mt-1 text-sm font-bold">{(currentStats?.points ?? 0).toLocaleString()}</p>
+              <p className="mt-1 text-sm font-bold">{currentStats.points.toLocaleString()}</p>
             </div>
             <div className="rounded-lg bg-white/10 p-3">
               <p className="text-[11px] text-white/62">Streak</p>
-              <p className="mt-1 text-sm font-bold">{currentStats?.loginStreakDays ?? 0} days</p>
+              <p className="mt-1 text-sm font-bold">{currentStats.loginStreakDays} days</p>
             </div>
           </div>
           <Link
@@ -60,7 +90,7 @@ export default function TripsPage() {
         </div>
       </section>
 
-      {currentUser?.plan === 'free' ? (
+      {currentUser.plan === 'free' ? (
         <section className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <div className="flex items-center gap-2 font-bold">
             <Gift className="h-4 w-4" aria-hidden="true" />
@@ -70,31 +100,7 @@ export default function TripsPage() {
         </section>
       ) : null}
 
-      <section className="mb-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-enadia-line bg-white p-4">
-          <Sparkles className="h-5 w-5 text-enadia-primary" aria-hidden="true" />
-          <p className="mt-3 text-2xl font-bold text-enadia-ink">{visibleTrips.length}</p>
-          <p className="text-xs font-semibold text-enadia-muted">Active trips</p>
-        </div>
-        <div className="rounded-lg border border-enadia-line bg-white p-4">
-          <Flame className="h-5 w-5 text-enadia-accent" aria-hidden="true" />
-          <p className="mt-3 text-2xl font-bold text-enadia-ink">{currentStats?.loginStreakDays ?? 0}</p>
-          <p className="text-xs font-semibold text-enadia-muted">Login streak</p>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        {visibleTrips.map((trip) => (
-          <TripCard
-            key={trip.id}
-            members={mockTripMembers.filter((member) => member.tripId === trip.id)}
-            onDelete={(tripId) => setHiddenTripIds((ids) => [...ids, tripId])}
-            photos={mockPhotos.filter((photo) => photo.tripId === trip.id)}
-            trip={trip}
-            users={mockUsers}
-          />
-        ))}
-      </section>
+      <TripListClient items={items} loginStreakDays={currentStats.loginStreakDays} users={users} />
     </AppShell>
   );
 }
