@@ -33,7 +33,8 @@ export function useCurrentUser() {
   const logout = async () => {
     setLoading(true);
     await supabase.auth.signOut();
-    router.push('/login'); // ログアウト後にログイン画面へリダイレクト
+    router.push('/auth/login');
+    router.refresh();
     setLoading(false);
   };
 
