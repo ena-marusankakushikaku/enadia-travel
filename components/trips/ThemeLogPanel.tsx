@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { ThemeEntryCard } from '@/components/trips/ThemeEntryCard';
 import { ThemeEntryModal } from '@/components/trips/ThemeEntryModal';
+import { persistThemeEntry } from '@/lib/api/themeEntriesClient';
 import type { ConquestEntry, ConquestProject, Photo, UserProfile } from '@/types/app';
 
 type ThemeLogPanelProps = {
@@ -15,18 +16,27 @@ type ThemeLogPanelProps = {
   projects: ConquestProject[];
   photos: Photo[];
   users: UserProfile[];
+  onSaved?: () => void;
 };
 
-export function ThemeLogPanel({ canAdd, entries, photos, projects, tripId, userId, users }: ThemeLogPanelProps) {
+export function ThemeLogPanel({ canAdd, entries, onSaved, photos, projects, tripId, userId, users }: ThemeLogPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [localEntries, setLocalEntries] = useState(entries);
   const [localProjects, setLocalProjects] = useState(projects);
+  const [saving, setSaving] = useState(false);
 
-  function saveEntry(entry: ConquestEntry, project?: ConquestProject) {
-    if (project) {
-      setLocalProjects((current) => [...current, { ...project, entries: [entry] }]);
+  async function saveEntry(entry: ConquestEntry, project?: ConquestProject) {
+    setSaving(true);
+    const persisted = await persistThemeEntry(entry, project);
+    setSaving(false);
+    if (!persisted) {
+      return;
     }
-    setLocalEntries((current) => [entry, ...current]);
+    if (persisted.project) {
+      setLocalProjects((current) => [...current, { ...persisted.project!, entries: [persisted.entry] }]);
+    }
+    setLocalEntries((current) => [persisted.entry, ...current]);
+    onSaved?.();
   }
 
   return (

@@ -3,51 +3,67 @@
 import { useState } from 'react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
-import type { TripMember, TripRole, UserProfile } from '@/types/app';
+import type { TripRole } from '@/types/app';
 
 type InviteMemberModalProps = {
   open: boolean;
   onClose: () => void;
   tripId: string;
-  candidates: UserProfile[];
-  onInvite: (member: TripMember) => void;
+  onInvited: () => void;
 };
 
-export function InviteMemberModal({ candidates, onClose, onInvite, open, tripId }: InviteMemberModalProps) {
-  const [userId, setUserId] = useState(candidates[0]?.id ?? '');
+export function InviteMemberModal({ onClose, onInvited, open, tripId }: InviteMemberModalProps) {
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState<TripRole>('viewer');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function invite() {
-    if (!userId) {
+  async function invite() {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       return;
     }
 
-    onInvite({
-      id: `member-${Date.now()}`,
-      tripId,
-      userId,
-      role,
-      joinedAt: new Date().toISOString()
+    setError(null);
+    setLoading(true);
+    const response = await fetch('/api/trip-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId, email: trimmedEmail, role })
     });
+    const data = (await response.json()) as { error?: string };
+    setLoading(false);
+
+    if (!response.ok) {
+      setError(data.error ?? '招待に失敗しました');
+      return;
+    }
+
+    setEmail('');
+    onInvited();
     onClose();
   }
 
   return (
     <Modal onClose={onClose} open={open} testId="invite-member-modal" title="メンバーを招待">
       <div className="space-y-4">
-        <select className="h-11 w-full rounded-lg border border-enadia-line bg-white px-3" value={userId} onChange={(event) => setUserId(event.target.value)}>
-          {candidates.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.displayName}
-            </option>
-          ))}
-        </select>
+        <label className="block">
+          <span className="text-sm font-bold text-enadia-ink">メールアドレス</span>
+          <input
+            className="mt-2 h-11 w-full rounded-lg border border-enadia-line bg-white px-3"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="member@example.com"
+            type="email"
+            value={email}
+          />
+        </label>
         <select className="h-11 w-full rounded-lg border border-enadia-line bg-white px-3" value={role} onChange={(event) => setRole(event.target.value as TripRole)}>
           <option value="viewer">viewer</option>
           <option value="editor">editor</option>
           <option value="owner">owner</option>
         </select>
-        <Button className="w-full" disabled={!userId} onClick={invite}>
+        {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
+        <Button className="w-full" disabled={!email.trim()} loading={loading} onClick={invite}>
           招待する
         </Button>
       </div>
