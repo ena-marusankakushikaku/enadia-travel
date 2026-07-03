@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { InviteMemberModal } from '@/components/trips/InviteMemberModal';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { TripMember, TripRole, UserProfile } from '@/types/app';
 
 type MemberPanelProps = {
@@ -12,6 +13,7 @@ type MemberPanelProps = {
   canManage: boolean;
   members: TripMember[];
   users: UserProfile[];
+  onChanged: () => void;
 };
 
 const roleDescriptions: Record<TripRole, string> = {
@@ -20,14 +22,31 @@ const roleDescriptions: Record<TripRole, string> = {
   viewer: '閲覧のみできます。'
 };
 
-export function MemberPanel({ canManage, currentUserId, members, tripId, users }: MemberPanelProps) {
+export function MemberPanel({ canManage, currentUserId, members, onChanged, tripId, users }: MemberPanelProps) {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [localMembers, setLocalMembers] = useState(members);
-  const memberIds = localMembers.map((member) => member.userId);
-  const candidates = users.filter((user) => !memberIds.includes(user.id));
+  const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
 
-  function changeRole(memberId: string, role: TripRole) {
+  async function changeRole(memberId: string, role: TripRole) {
+    setPendingMemberId(memberId);
+    const { error } = await createSupabaseBrowserClient().from('trip_members').update({ role }).eq('id', memberId);
+    setPendingMemberId(null);
+    if (error) {
+      return;
+    }
     setLocalMembers((current) => current.map((member) => (member.id === memberId ? { ...member, role } : member)));
+    onChanged();
+  }
+
+  async function removeMember(memberId: string) {
+    setPendingMemberId(memberId);
+    const { error } = await createSupabaseBrowserClient().from('trip_members').delete().eq('id', memberId);
+    setPendingMemberId(null);
+    if (error) {
+      return;
+    }
+    setLocalMembers((current) => current.filter((member) => member.id !== memberId));
+    onChanged();
   }
 
   return (
@@ -54,6 +73,7 @@ export function MemberPanel({ canManage, currentUserId, members, tripId, users }
 
       {localMembers.map((member) => {
         const user = users.find((item) => item.id === member.userId);
+        const isPending = pendingMemberId === member.id;
 
         return (
           <article className="rounded-lg border border-enadia-line bg-white p-4" key={member.id}>
@@ -75,8 +95,9 @@ export function MemberPanel({ canManage, currentUserId, members, tripId, users }
               {canManage ? (
                 <button
                   aria-label={`${user?.displayName ?? 'member'}を削除`}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-red-50 text-enadia-danger"
-                  onClick={() => setLocalMembers((current) => current.filter((item) => item.id !== member.id))}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-red-50 text-enadia-danger disabled:opacity-50"
+                  disabled={isPending}
+                  onClick={() => removeMember(member.id)}
                   type="button"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -88,7 +109,12 @@ export function MemberPanel({ canManage, currentUserId, members, tripId, users }
               )}
             </div>
             {canManage ? (
-              <select className="mt-3 h-10 w-full rounded-lg border border-enadia-line bg-white px-3 text-sm" value={member.role} onChange={(event) => changeRole(member.id, event.target.value as TripRole)}>
+              <select
+                className="mt-3 h-10 w-full rounded-lg border border-enadia-line bg-white px-3 text-sm disabled:opacity-50"
+                disabled={isPending}
+                onChange={(event) => changeRole(member.id, event.target.value as TripRole)}
+                value={member.role}
+              >
                 <option value="owner">owner</option>
                 <option value="editor">editor</option>
                 <option value="viewer">viewer</option>
@@ -99,9 +125,8 @@ export function MemberPanel({ canManage, currentUserId, members, tripId, users }
       })}
 
       <InviteMemberModal
-        candidates={candidates}
         onClose={() => setIsInviteOpen(false)}
-        onInvite={(member) => setLocalMembers((current) => [...current, member])}
+        onInvited={onChanged}
         open={isInviteOpen}
         tripId={tripId}
       />
