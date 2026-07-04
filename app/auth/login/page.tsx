@@ -35,8 +35,6 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
-  // TEMPORARY: remove once the PKCE code-verifier cookie issue is diagnosed.
-  const [cookieDebug, setCookieDebug] = useState<string | null>(null);
 
   const handleEmailLogin = async () => {
     const trimmedEmail = email.trim();
@@ -55,16 +53,6 @@ function LoginPageContent() {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
         }
       });
-
-      const verifierCookies = document.cookie
-        .split('; ')
-        .filter((entry) => entry.includes('code-verifier'))
-        .map((entry) => entry.split('=')[0]);
-      setCookieDebug(
-        verifierCookies.length > 0
-          ? `code-verifier cookie found: ${verifierCookies.join(', ')}`
-          : 'code-verifier cookie NOT found in document.cookie'
-      );
 
       if (signInError) {
         setError(signInError.message);
@@ -130,11 +118,6 @@ function LoginPageContent() {
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
-            ) : null}
-
-            {/* TEMPORARY debug output, remove once the PKCE cookie issue is diagnosed */}
-            {cookieDebug ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{cookieDebug}</div>
             ) : null}
 
             <Button variant="primary" onClick={handleGoogleLogin} loading={loading} className="w-full">

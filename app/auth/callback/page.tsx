@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
@@ -31,29 +31,14 @@ function AuthCallbackContent() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // TEMPORARY: remove once the PKCE code-verifier cookie issue is diagnosed.
-  const [cookieDebug, setCookieDebug] = useState<string | null>(null);
-
-  useEffect(() => {
-    const verifierCookies = document.cookie
-      .split('; ')
-      .filter((entry) => entry.includes('code-verifier'))
-      .map((entry) => entry.split('=')[0]);
-    setCookieDebug(
-      verifierCookies.length > 0
-        ? `code-verifier cookie present on load: ${verifierCookies.join(', ')}`
-        : 'code-verifier cookie NOT found on load (all cookies: ' +
-            (document.cookie
-              .split('; ')
-              .map((entry) => entry.split('=')[0])
-              .join(', ') || 'none') +
-            ')'
-    );
-  }, []);
 
   // The exchange only runs on this explicit click, never on page load, so that
   // automated link scanners (e.g. corporate email safe-link prefetchers) that
   // GET this URL can't burn the single-use code before the real user does.
+  // detectSessionInUrl/isSingleton are overridden because a default client
+  // auto-consumes any `?code=` in the URL the instant it's constructed
+  // (GoTrueClient auto-initializes in its constructor), which raced with and
+  // silently burned the code before this explicit call could use it.
   async function completeSignIn() {
     if (!code) {
       return;
@@ -61,7 +46,10 @@ function AuthCallbackContent() {
 
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
+    const supabase = createSupabaseBrowserClient({
+      isSingleton: false,
+      auth: { detectSessionInUrl: false }
+    });
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError) {
@@ -89,8 +77,6 @@ function AuthCallbackContent() {
       <section className="mx-auto max-w-xs space-y-4 py-8 text-center">
         <p className="text-sm text-enadia-muted">下のボタンを押してログインを完了してください。</p>
         {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
-        {/* TEMPORARY debug output, remove once the PKCE cookie issue is diagnosed */}
-        {cookieDebug ? <p className="break-all text-left text-[11px] text-amber-700">{cookieDebug}</p> : null}
         <Button className="w-full" loading={loading} onClick={completeSignIn} variant="primary">
           ログインを完了する
         </Button>
