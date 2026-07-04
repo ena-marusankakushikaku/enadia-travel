@@ -15,7 +15,7 @@ export function ThemeEntryCard({ entry, onDelete, photo, project, user }: ThemeE
     <article className="rounded-lg border border-enadia-line bg-white p-4 shadow-sm">
       <div className="flex gap-3">
         {photo ? (
-          <MockPhoto className="h-20 w-20 shrink-0 rounded-lg" index={photo.mockImageIndex} title={null} />
+          <MockPhoto className="h-20 w-20 shrink-0 rounded-lg" index={photo.mockImageIndex} src={photo.imageUrl} title={null} />
         ) : (
           <div className="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-slate-100 text-2xl">
             {project?.emoji ?? '🎯'}

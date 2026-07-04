@@ -6,7 +6,7 @@ import { TripListClient, type TripListItem } from '@/components/trips/TripListCl
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
-import { mapPhotoRow } from '@/lib/api/photos';
+import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
 import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
 import type { UserProfile } from '@/types/app';
 
@@ -34,7 +34,7 @@ export default async function TripsPage() {
     )
   );
   const members = (memberRows ?? []).map(mapTripMemberRow);
-  const photos = (photoRows ?? []).map(mapPhotoRow);
+  const photos = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
 
   const memberUserIds = Array.from(new Set(members.map((member) => member.userId)));
   const { data: publicProfileRows } = memberUserIds.length
