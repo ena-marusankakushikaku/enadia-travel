@@ -5,9 +5,24 @@ type MockPhotoProps = {
   index?: number;
   title?: string | null;
   className?: string;
+  src?: string | null;
 };
 
-export function MockPhoto({ className, index = 0, title }: MockPhotoProps) {
+export function MockPhoto({ className, index = 0, src, title }: MockPhotoProps) {
+  if (src) {
+    return (
+      <div className={clsx('relative overflow-hidden bg-slate-900', className)}>
+        <img alt={title ?? ''} className="absolute inset-0 h-full w-full object-cover" src={src} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+        {title ? (
+          <div className="absolute bottom-3 left-3 right-3">
+            <p className="line-clamp-1 text-sm font-bold text-white drop-shadow">{title}</p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   const gradient = MOCK_PHOTO_GRADIENTS[index % MOCK_PHOTO_GRADIENTS.length];
 
   return (

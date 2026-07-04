@@ -68,7 +68,7 @@ export function TripDetailClient({
     <>
       <section className="overflow-hidden rounded-lg border border-enadia-line bg-white shadow-sm">
         <div className="relative">
-          <MockPhoto className="aspect-[16/10] w-full" title={trip.area} />
+          <MockPhoto className="aspect-[16/10] w-full" src={coverPhoto?.imageUrl} title={trip.area} />
           <button
             aria-label="戻る"
             className="absolute left-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-black/35 text-white backdrop-blur transition hover:bg-black/55"

@@ -84,6 +84,7 @@ export type Photo = {
   storagePath: string;
   thumbnailPath?: string | null;
   mockImageIndex?: number;
+  imageUrl?: string | null;
   lat: number | null;
   lng: number | null;
   placeName: string | null;
