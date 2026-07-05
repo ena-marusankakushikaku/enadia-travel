@@ -53,10 +53,10 @@ export async function POST(request: Request) {
 
   const { data: tripId, error } = await supabase.rpc('create_trip_with_owner', {
     p_title: body.title.trim(),
-    p_area: body.area ?? null,
-    p_starts_at: body.startsAt ?? null,
-    p_ends_at: body.endsAt ?? null,
-    p_description: body.description ?? null
+    p_area: body.area ?? undefined,
+    p_starts_at: body.startsAt ?? undefined,
+    p_ends_at: body.endsAt ?? undefined,
+    p_description: body.description ?? undefined
   });
 
   if (error) {

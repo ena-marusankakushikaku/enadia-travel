@@ -49,6 +49,17 @@ export type TripMember = {
   joinedAt: string;
 };
 
+export type TripInvite = {
+  id: string;
+  tripId: string;
+  token: string;
+  createdBy: string;
+  role: TripRole;
+  isActive: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+};
+
 export type Trip = {
   id: string;
   title: string;

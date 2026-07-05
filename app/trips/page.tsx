@@ -41,7 +41,11 @@ export default async function TripsPage() {
     ? await supabase.from('public_profiles').select('*').in('id', memberUserIds)
     : { data: [] };
 
-  const usersById = new Map<string, UserProfile>((publicProfileRows ?? []).map((row) => [row.id, mapPublicProfileRow(row)]));
+  const usersById = new Map<string, UserProfile>(
+    (publicProfileRows ?? [])
+      .filter((row): row is typeof row & { id: string } => row.id !== null)
+      .map((row) => [row.id, mapPublicProfileRow(row)])
+  );
   const currentUser = ownProfileRow
     ? mapProfileRow(ownProfileRow)
     : { id: user.id, displayName: user.email ?? 'Traveler', avatarUrl: null, plan: 'free' as const, homePrefectureId: null };

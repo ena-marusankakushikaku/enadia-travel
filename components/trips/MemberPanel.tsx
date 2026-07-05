@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
+import { InviteLinkGenerator } from '@/components/trips/InviteLinkGenerator';
 import { InviteMemberModal } from '@/components/trips/InviteMemberModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { TripMember, TripRole, UserProfile } from '@/types/app';
@@ -51,6 +52,8 @@ export function MemberPanel({ canManage, currentUserId, members, onChanged, trip
 
   return (
     <section className="space-y-4">
+      {canManage ? <InviteLinkGenerator currentUserId={currentUserId} tripId={tripId} /> : null}
+
       <div className="rounded-lg border border-enadia-line bg-white p-4">
         <h2 className="text-base font-bold text-enadia-ink">権限の説明</h2>
         <div className="mt-3 space-y-2 text-sm text-enadia-muted">
