@@ -1,12 +1,38 @@
+import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { TravelMap } from '@/components/trips/TravelMap';
-import { mockPhotos, mockTrips } from '@/constants/mockData';
 import { getPrefectureName } from '@/constants/japan';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { mapTripRow } from '@/lib/api/trips';
+import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
 
-export default function TravelLogPage() {
-  const sortedPhotos = [...mockPhotos].sort(
+export default async function TravelLogPage() {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/auth/login');
+  }
+
+  const [{ data: photoRows }, { data: tripRows }, { data: memberRows }] = await Promise.all([
+    supabase.from('photos').select('*'),
+    supabase.from('trips').select('*').order('created_at', { ascending: false }),
+    supabase.from('trip_members').select('*')
+  ]);
+
+  const photos = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
+  const sortedPhotos = [...photos].sort(
     (a, b) => new Date(a.capturedAt ?? a.ts).getTime() - new Date(b.capturedAt ?? b.ts).getTime()
   );
+  const trips = (tripRows ?? []).map((row) =>
+    mapTripRow(
+      row,
+      (memberRows ?? []).filter((member) => member.trip_id === row.id).map((member) => member.user_id)
+    )
+  );
+
   const placeCount = new Set(sortedPhotos.map((photo) => photo.placeName).filter(Boolean)).size;
   const prefectureCount = new Set(sortedPhotos.map((photo) => photo.prefectureId).filter(Boolean)).size;
   const suggestedThemes = sortedPhotos.flatMap((photo) => photo.suggestedThemes ?? []);
@@ -45,7 +71,7 @@ export default function TravelLogPage() {
             </div>
           </section>
           <section className="space-y-3">
-            {mockTrips.map((trip) => {
+            {trips.map((trip) => {
               const tripPhotos = sortedPhotos.filter((photo) => photo.tripId === trip.id);
               if (tripPhotos.length === 0) return null;
 
