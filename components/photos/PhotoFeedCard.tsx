@@ -33,7 +33,7 @@ export function PhotoFeedCard({
   return (
     <article className="overflow-hidden rounded-lg border border-enadia-line bg-white shadow-sm">
       <button className="block w-full text-left" onClick={() => onOpenPhoto(photo)} type="button">
-        <MockPhoto className="aspect-[4/3] w-full" index={photo.mockImageIndex} title={photo.placeName} />
+        <MockPhoto className="aspect-[4/3] w-full" index={photo.mockImageIndex} src={photo.imageUrl} title={photo.placeName} />
       </button>
       <div className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">

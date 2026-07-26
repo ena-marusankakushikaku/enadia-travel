@@ -23,7 +23,7 @@ export function TripCard({ members, onDelete, photos, trip, users }: TripCardPro
   return (
     <article className="overflow-hidden rounded-lg border border-enadia-line bg-white shadow-sm">
       <Link className="block" href={`/trips/${trip.id}`}>
-        <MockPhoto className="aspect-[16/9] w-full" index={coverPhoto?.mockImageIndex ?? 0} title={trip.area} />
+        <MockPhoto className="aspect-[16/9] w-full" index={coverPhoto?.mockImageIndex ?? 0} src={coverPhoto?.imageUrl} title={trip.area} />
       </Link>
       <div className="space-y-4 p-4">
         <div className="flex items-start justify-between gap-3">

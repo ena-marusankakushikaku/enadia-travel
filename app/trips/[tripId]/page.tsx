@@ -6,7 +6,7 @@ import { TripDetailClient } from '@/components/trips/TripDetailClient';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
-import { mapPhotoRow } from '@/lib/api/photos';
+import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
 import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
 import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
@@ -47,7 +47,7 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
   ]);
 
   const members = (memberRows ?? []).map(mapTripMemberRow);
-  const photos = (photoRows ?? []).map(mapPhotoRow);
+  const photos = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
   const themeEntries = (entryRows ?? []).map(mapConquestEntryRow);
   const currentRole = getTripRole(params.tripId, user.id, members);
   const trip = mapTripRow(tripRow, members.map((member) => member.userId));

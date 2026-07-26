@@ -249,6 +249,12 @@ export type Database = {
         };
         Returns: string;
       };
+      redeem_trip_invite: {
+        Args: {
+          p_token: string;
+        };
+        Returns: string;
+      };
     };
   };
 };

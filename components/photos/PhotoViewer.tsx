@@ -36,7 +36,7 @@ export function PhotoViewer({ onClose, open, photo, users }: PhotoViewerProps) {
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
-      <MockPhoto className="min-h-0 flex-1" index={photo.mockImageIndex} title={photo.placeName} />
+      <MockPhoto className="min-h-0 flex-1" index={photo.mockImageIndex} src={photo.imageUrl} title={photo.placeName} />
       <section className="safe-bottom border-t border-white/10 bg-slate-950/96 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm text-white/72">
           <MapPin className="h-4 w-4" aria-hidden="true" />

@@ -43,6 +43,7 @@ export function PhotoUploadButton({ onUploaded, tripId }: PhotoUploadButtonProps
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
+          event.target.value = '';
           if (file) void upload(file);
         }}
         ref={inputRef}
@@ -55,7 +56,7 @@ export function PhotoUploadButton({ onUploaded, tripId }: PhotoUploadButtonProps
         size="sm"
         variant="secondary"
       >
-        実画像
+        写真をアップロード
       </Button>
       {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
     </div>
