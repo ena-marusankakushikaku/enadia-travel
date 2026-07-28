@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api/auth';
 import { insertTourismEvent } from '@/lib/tourism-events';
+import { extractPhotoExif } from '@/lib/geo/photoExif';
+import { resolveLocation } from '@/lib/geo/reverseGeocode';
 
 export async function POST(request: Request) {
   const { response, supabase, user } = await requireUser();
@@ -30,6 +32,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'editor role required' }, { status: 403 });
   }
 
+  // 位置情報の取得はあくまで付加価値なので、ここで失敗してもアップロード自体は成功させる
+  const exif = await extractPhotoExif(await file.arrayBuffer()).catch(() => ({
+    lat: null,
+    lng: null,
+    capturedAt: null
+  }));
+  const location =
+    exif.lat !== null && exif.lng !== null ? await resolveLocation(exif.lat, exif.lng).catch(() => null) : null;
+
   const extension = file.name.split('.').pop() ?? 'jpg';
   const storagePath = `${tripId}/${crypto.randomUUID()}.${extension}`;
   const { error: uploadError } = await supabase.storage
@@ -47,6 +58,12 @@ export async function POST(request: Request) {
       uploaded_by: user.id,
       storage_path: storagePath,
       caption: typeof caption === 'string' ? caption : null,
+      lat: exif.lat,
+      lng: exif.lng,
+      captured_at: exif.capturedAt,
+      prefecture_id: location?.prefectureId ?? null,
+      place_name: location?.placeName ?? null,
+      confidence: location?.confidence ?? null,
       ai_processing_status: 'pending',
       suggested_themes: [],
       ai_tags: [],
@@ -66,5 +83,25 @@ export async function POST(request: Request) {
     metadata: { storagePath }
   });
 
-  return NextResponse.json({ photo }, { status: 201 });
+  if (location) {
+    await insertTourismEvent('place_visit_detected', {
+      userId: user.id,
+      tripId,
+      photoId: photo.id,
+      prefectureId: location.prefectureId,
+      lat: exif.lat ?? undefined,
+      lng: exif.lng ?? undefined,
+      placeName: location.placeName ?? undefined,
+      metadata: { source: location.source }
+    });
+  }
+
+  return NextResponse.json(
+    {
+      photo,
+      // 位置情報が取れなかった場合、クライアント側で手動入力を促すために返す
+      locationDetected: location !== null
+    },
+    { status: 201 }
+  );
 }

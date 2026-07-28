@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { MapPin, Plus } from 'lucide-react';
+import { JapanMap } from '@/components/map/JapanMap';
+import { getPrefectureName } from '@/constants/japan';
 import type { Photo } from '@/types/app';
 
 type TravelMapProps = {
@@ -11,14 +13,6 @@ type TravelMapProps = {
 
 type GeoPhoto = Photo & { lat: number; lng: number };
 
-function normalize(value: number, min: number, max: number): number {
-  if (min === max) {
-    return 50;
-  }
-
-  return 12 + ((value - min) / (max - min)) * 76;
-}
-
 export function TravelMap({ onAddThemeFromPhoto, photos }: TravelMapProps) {
   const geoPhotos = useMemo(
     () =>
@@ -27,8 +21,22 @@ export function TravelMap({ onAddThemeFromPhoto, photos }: TravelMapProps) {
         .sort((a, b) => new Date(a.capturedAt ?? a.ts).getTime() - new Date(b.capturedAt ?? b.ts).getTime()),
     [photos]
   );
-  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(geoPhotos[0]?.id ?? null);
+
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const selectedPhoto = geoPhotos.find((photo) => photo.id === selectedPhotoId) ?? geoPhotos[0];
+
+  const markers = useMemo(
+    () => geoPhotos.map((photo) => ({ id: photo.id, lat: photo.lat, lng: photo.lng })),
+    [geoPhotos]
+  );
+
+  const visitedPrefectureIds = useMemo(
+    () =>
+      Array.from(
+        new Set(geoPhotos.map((photo) => photo.prefectureId).filter((id): id is number => id !== null))
+      ),
+    [geoPhotos]
+  );
 
   if (geoPhotos.length === 0) {
     return (
@@ -38,62 +46,41 @@ export function TravelMap({ onAddThemeFromPhoto, photos }: TravelMapProps) {
     );
   }
 
-  const lats = geoPhotos.map((photo) => photo.lat);
-  const lngs = geoPhotos.map((photo) => photo.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const points = geoPhotos.map((photo) => ({
-    photo,
-    left: normalize(photo.lng, minLng, maxLng),
-    top: 88 - normalize(photo.lat, minLat, maxLat)
-  }));
-
   return (
     <section className="rounded-lg border border-enadia-line bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
         <MapPin className="h-4 w-4 text-enadia-primary" aria-hidden="true" />
         <h2 className="text-base font-bold text-enadia-ink">Travel Map</h2>
+        <span className="ml-auto text-xs font-semibold text-enadia-muted">
+          {geoPhotos.length}地点 / {visitedPrefectureIds.length}都道府県
+        </span>
       </div>
-      <div className="relative h-56 overflow-hidden rounded-lg bg-[linear-gradient(135deg,#dff4f0_0%,#edf7ff_48%,#f7f2df_100%)]">
-        <svg className="absolute inset-0 h-full w-full" role="img" aria-label="旅の位置情報マップ" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <polyline
-            fill="none"
-            points={points.map((point) => `${point.left},${point.top}`).join(' ')}
-            stroke="#0f8b8d"
-            strokeDasharray="2 2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-          />
-        </svg>
-        {points.map((point, index) => (
-          <button
-            className="absolute -translate-x-1/2 -translate-y-1/2"
-            key={point.photo.id}
-            onClick={() => setSelectedPhotoId(point.photo.id)}
-            style={{ left: `${point.left}%`, top: `${point.top}%` }}
-            type="button"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-enadia-primary text-sm font-bold text-white shadow-lg ring-4 ring-white">
-              {index + 1}
-            </span>
-          </button>
-        ))}
+
+      <div className="overflow-hidden rounded-lg bg-[linear-gradient(160deg,#eef7fb_0%,#f6fbfd_100%)] p-2">
+        <JapanMap
+          highlightedPrefectureIds={visitedPrefectureIds}
+          markers={markers}
+          onSelectMarker={setSelectedPhotoId}
+          selectedMarkerId={selectedPhoto?.id ?? null}
+          showRoute
+        />
       </div>
+
       {selectedPhoto ? (
         <div className="mt-3 rounded-lg bg-slate-50 p-3">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-bold text-enadia-ink">{selectedPhoto.placeName ?? '地点未設定'}</p>
+            <div className="min-w-0">
+              <p className="truncate font-bold text-enadia-ink">{selectedPhoto.placeName ?? '地点未設定'}</p>
               <p className="mt-1 text-xs text-enadia-muted">
-                confidence {selectedPhoto.confidence ? Math.round(selectedPhoto.confidence * 100) : 0}%
+                {getPrefectureName(selectedPhoto.prefectureId)}
+                {selectedPhoto.confidence !== null
+                  ? ` ・ 位置の確度 ${Math.round(selectedPhoto.confidence * 100)}%`
+                  : ''}
               </p>
             </div>
             {onAddThemeFromPhoto ? (
               <button
-                className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-enadia-primary"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-enadia-primary"
                 onClick={() => onAddThemeFromPhoto(selectedPhoto)}
                 type="button"
               >

@@ -6,6 +6,7 @@ import { ArrowLeft, Bot, Share2, UsersRound } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PhotoFeedCard } from '@/components/photos/PhotoFeedCard';
 import { PhotoViewer } from '@/components/photos/PhotoViewer';
+import { PhotoLocationModal } from '@/components/photos/PhotoLocationModal';
 import { MockPhoto } from '@/components/photos/MockPhoto';
 import { PhotoUploadButton } from '@/components/photos/PhotoUploadButton';
 import { TravelMap } from '@/components/trips/TravelMap';
@@ -50,6 +51,7 @@ export function TripDetailClient({
   const [activeTab, setActiveTab] = useState<TripTab>('photos');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [themeModalPhoto, setThemeModalPhoto] = useState<Photo | null>(null);
+  const [locationModalPhoto, setLocationModalPhoto] = useState<Photo | null>(null);
 
   const canAddContent = canEditTrip(currentRole);
   const canManageMembers = canManageTrip(currentRole);
@@ -137,6 +139,7 @@ export function TripDetailClient({
               <PhotoFeedCard
                 key={photo.id}
                 onComment={() => undefined}
+                onEditLocation={canAddContent ? setLocationModalPhoto : undefined}
                 onOpenPhoto={setSelectedPhoto}
                 onReact={() => undefined}
                 photo={photo}
@@ -188,6 +191,12 @@ export function TripDetailClient({
         userId={currentUserId}
       />
       <PhotoViewer onClose={() => setSelectedPhoto(null)} open={selectedPhoto !== null} photo={selectedPhoto} users={users} />
+      <PhotoLocationModal
+        onClose={() => setLocationModalPhoto(null)}
+        onSaved={() => router.refresh()}
+        open={locationModalPhoto !== null}
+        photo={locationModalPhoto}
+      />
     </>
   );
 }
