@@ -1,8 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/common/Button';
 import { ConquestCard } from '@/components/conquest/ConquestCard';
+import { CreateConquestProjectModal } from '@/components/conquest/CreateConquestProjectModal';
 import { JapanConquestMap } from '@/components/conquest/JapanConquestMap';
 import { PrefectureDetailSheet } from '@/components/conquest/PrefectureDetailSheet';
 import type { ConquestEntry, ConquestProject, Photo, UserProfile } from '@/types/app';
@@ -17,8 +21,10 @@ type ConquestPageClientProps = {
 const ALL = 'all';
 
 export function ConquestPageClient({ entries, photos, projects, users }: ConquestPageClientProps) {
+  const router = useRouter();
   const [selectedPrefectureId, setSelectedPrefectureId] = useState<number | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(ALL);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
 
@@ -97,17 +103,42 @@ export function ConquestPageClient({ entries, photos, projects, users }: Conques
         />
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-enadia-ink">制覇プロジェクト</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-enadia-ink">制覇プロジェクト</h2>
+            <Button
+              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => setIsCreateOpen(true)}
+              size="sm"
+            >
+              テーマを作成
+            </Button>
+          </div>
 
           {projects.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-enadia-line bg-white p-5 text-center text-sm text-enadia-muted">
-              まだテーマがありません。旅の詳細画面の「テーマログ」から記録すると、ここに制覇状況が表示されます。
-            </p>
+            <div className="rounded-lg border border-dashed border-enadia-line bg-white p-6 text-center">
+              <p className="text-sm text-enadia-muted">
+                まだテーマがありません。「地酒」「温泉」など集めたいテーマを作ると、旅の記録がここに集まります。
+              </p>
+              <Button
+                className="mx-auto mt-4"
+                icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => setIsCreateOpen(true)}
+              >
+                最初のテーマを作成
+              </Button>
+            </div>
           ) : (
             projects.map((project) => <ConquestCard key={project.id} project={project} />)
           )}
         </section>
       </div>
+
+      <CreateConquestProjectModal
+        existingNames={projects.map((project) => project.name)}
+        onClose={() => setIsCreateOpen(false)}
+        onCreated={() => router.refresh()}
+        open={isCreateOpen}
+      />
 
       {selectedPrefectureId !== null ? (
         <PrefectureDetailSheet

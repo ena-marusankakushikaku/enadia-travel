@@ -100,7 +100,7 @@ export default async function TripsPage() {
         </section>
       ) : null}
 
-      <TripListClient items={items} loginStreakDays={currentStats.loginStreakDays} users={users} />
+      <TripListClient items={items} users={users} />
     </AppShell>
   );
 }

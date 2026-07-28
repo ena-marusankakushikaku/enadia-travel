@@ -113,6 +113,45 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['photos']['Insert']>;
         Relationships: [];
       };
+      photo_reactions: {
+        Row: {
+          id: string;
+          photo_id: string;
+          user_id: string;
+          /** like=みんなに見えるいいね / heart=自分だけのお気に入り */
+          reaction_type: 'like' | 'heart' | 'wow' | 'seen';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          photo_id: string;
+          user_id: string;
+          reaction_type: 'like' | 'heart' | 'wow' | 'seen';
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['photo_reactions']['Insert']>;
+        Relationships: [];
+      };
+      photo_comments: {
+        Row: {
+          id: string;
+          photo_id: string;
+          user_id: string;
+          text: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          photo_id: string;
+          user_id: string;
+          text: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['photo_comments']['Insert']>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;

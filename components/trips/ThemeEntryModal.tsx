@@ -5,6 +5,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { DEFAULT_CONQUEST_THEMES } from '@/constants/themes';
 import { MAP_PREFECTURES } from '@/constants/japan';
+import { RatingInput } from '@/components/conquest/RatingInput';
 import type { ConquestEntry, ConquestProject, Photo } from '@/types/app';
 
 type ThemeEntryModalProps = {
@@ -33,7 +34,7 @@ export function ThemeEntryModal({
   const [title, setTitle] = useState(initialPhoto?.placeName ?? '');
   const [prefectureId, setPrefectureId] = useState(String(initialPhoto?.prefectureId ?? 26));
   const [placeName, setPlaceName] = useState(initialPhoto?.placeName ?? '');
-  const [rating, setRating] = useState('4');
+  const [rating, setRating] = useState<number | null>(null);
   const [memo, setMemo] = useState('');
   const [photoId, setPhotoId] = useState(initialPhoto?.id ?? '');
 
@@ -73,7 +74,7 @@ export function ThemeEntryModal({
         prefectureId: Number(prefectureId),
         title: title.trim(),
         memo: memo.trim() || null,
-        rating: Number(rating),
+        rating,
         visitedAt: new Date().toISOString(),
         placeName: placeName.trim() || linkedPhoto?.placeName || null,
         lat: linkedPhoto?.lat ?? null,
@@ -113,13 +114,7 @@ export function ThemeEntryModal({
           ))}
         </select>
         <input className="h-11 w-full rounded-lg border border-enadia-line px-3" placeholder="地点名" value={placeName} onChange={(event) => setPlaceName(event.target.value)} />
-        <select className="h-11 w-full rounded-lg border border-enadia-line bg-white px-3" value={rating} onChange={(event) => setRating(event.target.value)}>
-          {[5, 4, 3, 2, 1].map((value) => (
-            <option key={value} value={value}>
-              評価 {value}
-            </option>
-          ))}
-        </select>
+        <RatingInput onChange={setRating} value={rating} />
         <textarea className="min-h-24 w-full rounded-lg border border-enadia-line p-3" placeholder="メモ" value={memo} onChange={(event) => setMemo(event.target.value)} />
         <select className="h-11 w-full rounded-lg border border-enadia-line bg-white px-3" value={photoId} onChange={(event) => setPhotoId(event.target.value)}>
           <option value="">写真なし</option>
