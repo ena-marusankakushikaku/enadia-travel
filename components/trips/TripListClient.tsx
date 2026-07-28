@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Flame, Sparkles } from 'lucide-react';
 import { TripCard } from '@/components/trips/TripCard';
 import type { Photo, Trip, TripMember, UserProfile } from '@/types/app';
 
@@ -14,43 +13,84 @@ export type TripListItem = {
 type TripListClientProps = {
   items: TripListItem[];
   users: UserProfile[];
-  loginStreakDays: number;
 };
 
-export function TripListClient({ items, loginStreakDays, users }: TripListClientProps) {
+/** 日付が取れないときのグループ用（年不明として一番下にまとめる） */
+const UNKNOWN_YEAR = 0;
+
+function getYear(trip: Trip): number {
+  const parsed = new Date(trip.startsAt);
+  return Number.isNaN(parsed.getTime()) ? UNKNOWN_YEAR : parsed.getFullYear();
+}
+
+export function TripListClient({ items, users }: TripListClientProps) {
   const [hiddenTripIds, setHiddenTripIds] = useState<string[]>([]);
+
   const visibleItems = useMemo(
     () => items.filter((item) => !hiddenTripIds.includes(item.trip.id)),
     [items, hiddenTripIds]
   );
 
-  return (
-    <>
-      <section className="mb-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-enadia-line bg-white p-4">
-          <Sparkles className="h-5 w-5 text-enadia-primary" aria-hidden="true" />
-          <p className="mt-3 text-2xl font-bold text-enadia-ink">{visibleItems.length}</p>
-          <p className="text-xs font-semibold text-enadia-muted">Active trips</p>
-        </div>
-        <div className="rounded-lg border border-enadia-line bg-white p-4">
-          <Flame className="h-5 w-5 text-enadia-accent" aria-hidden="true" />
-          <p className="mt-3 text-2xl font-bold text-enadia-ink">{loginStreakDays}</p>
-          <p className="text-xs font-semibold text-enadia-muted">Login streak</p>
-        </div>
-      </section>
+  // 年ごとにまとめ、新しい年・新しい旅から順に並べる
+  const groups = useMemo(() => {
+    const byYear = new Map<number, TripListItem[]>();
 
-      <section className="space-y-4">
-        {visibleItems.map(({ trip, members, photos }) => (
-          <TripCard
-            key={trip.id}
-            members={members}
-            onDelete={(tripId) => setHiddenTripIds((ids) => [...ids, tripId])}
-            photos={photos}
-            trip={trip}
-            users={users}
-          />
-        ))}
-      </section>
-    </>
+    for (const item of visibleItems) {
+      const year = getYear(item.trip);
+      const group = byYear.get(year);
+      if (group) {
+        group.push(item);
+      } else {
+        byYear.set(year, [item]);
+      }
+    }
+
+    return Array.from(byYear.entries())
+      .map(([year, groupItems]) => ({
+        year,
+        items: [...groupItems].sort(
+          (a, b) => new Date(b.trip.startsAt).getTime() - new Date(a.trip.startsAt).getTime()
+        )
+      }))
+      .sort((a, b) => b.year - a.year);
+  }, [visibleItems]);
+
+  if (visibleItems.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-enadia-line bg-white p-6 text-center text-sm text-enadia-muted">
+        旅がまだありません。「新しい旅を作成」から始めましょう。
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-xs font-semibold text-enadia-muted">全 {visibleItems.length} 件の旅</p>
+
+      {groups.map((group) => (
+        <section key={group.year}>
+          <div className="mb-2 flex items-center gap-3">
+            <h2 className="text-base font-bold text-enadia-ink">
+              {group.year === UNKNOWN_YEAR ? '日付未設定' : `${group.year}年`}
+            </h2>
+            <span className="text-xs font-semibold text-enadia-muted">{group.items.length}件</span>
+            <span className="h-px flex-1 bg-enadia-line" />
+          </div>
+
+          <div className="space-y-2">
+            {group.items.map(({ members, photos, trip }) => (
+              <TripCard
+                key={trip.id}
+                members={members}
+                onDelete={(tripId) => setHiddenTripIds((ids) => [...ids, tripId])}
+                photos={photos}
+                trip={trip}
+                users={users}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }

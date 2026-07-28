@@ -6,7 +6,7 @@ import { TripDetailClient } from '@/components/trips/TripDetailClient';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
-import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
+import { attachPhotoImageUrls, attachPhotoInteractions, mapPhotoRow } from '@/lib/api/photos';
 import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
 import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
@@ -47,13 +47,22 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
   ]);
 
   const members = (memberRows ?? []).map(mapTripMemberRow);
-  const photos = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
+  const photosWithUrls = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
+  const photos = await attachPhotoInteractions(supabase, photosWithUrls, user.id);
   const themeEntries = (entryRows ?? []).map(mapConquestEntryRow);
   const currentRole = getTripRole(params.tripId, user.id, members);
   const trip = mapTripRow(tripRow, members.map((member) => member.userId));
 
-  const { data: projectRows } = await supabase.from('conquest_projects').select('*').eq('user_id', user.id);
-  const themeProjects = (projectRows ?? []).map(mapConquestProjectRow);
+  // テーマ選択で「N / 47県」を出すため、この旅に限らず自分の記録をすべて取得する
+  const [{ data: projectRows }, { data: allEntryRows }] = await Promise.all([
+    supabase.from('conquest_projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('conquest_entries').select('*').eq('user_id', user.id)
+  ]);
+  const allEntries = (allEntryRows ?? []).map(mapConquestEntryRow);
+  const themeProjects = (projectRows ?? []).map((row) => ({
+    ...mapConquestProjectRow(row),
+    entries: allEntries.filter((entry) => entry.projectId === row.id)
+  }));
 
   const memberUserIds = Array.from(new Set(members.map((member) => member.userId)));
   const { data: publicProfileRows } = memberUserIds.length

@@ -2,6 +2,7 @@ import { Crown } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
+import { LogoutButton } from '@/components/profile/LogoutButton';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 function getRank(points: number): string {
@@ -59,9 +60,10 @@ export default async function ProfilePage() {
           <div className="grid h-14 w-14 place-items-center rounded-full bg-enadia-primary text-xl font-bold text-white">
             {displayName.slice(0, 1)}
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-enadia-ink">{displayName}</h2>
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-bold text-enadia-ink">{displayName}</h2>
             <p className="mt-1 text-sm font-semibold text-enadia-primary">{getRank(points)}</p>
+            {user.email ? <p className="mt-1 break-all text-xs text-enadia-muted">{user.email}</p> : null}
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
@@ -114,6 +116,14 @@ export default async function ProfilePage() {
             </article>
           ))
         )}
+      </section>
+
+      <section className="mt-5 rounded-lg border border-enadia-line bg-white p-5 shadow-sm">
+        <h2 className="text-base font-bold text-enadia-ink">アカウント</h2>
+        <p className="mb-3 mt-1 text-xs text-enadia-muted">
+          ログアウトすると、次に使うときに再度ログインが必要になります。
+        </p>
+        <LogoutButton />
       </section>
     </AppShell>
   );
