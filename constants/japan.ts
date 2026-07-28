@@ -63,3 +63,27 @@ export function getPrefectureName(prefectureId: number | null | undefined): stri
 
   return MAP_PREFECTURES.find((prefecture) => prefecture.id === prefectureId)?.name ?? `#${prefectureId}`;
 }
+
+/**
+ * 表示用の地点名を組み立てる。
+ * 「広坂一丁目」だけでは後から見返したときに場所が分からないため、
+ * 「石川県 広坂一丁目」のように都道府県名を頭に付ける。
+ * すでに都道府県名で始まっている場合は二重に付けない。
+ */
+export function formatPlaceName(
+  prefectureId: number | null | undefined,
+  areaName: string | null | undefined
+): string {
+  const prefectureName = getPrefectureName(prefectureId);
+  const trimmed = (areaName ?? '').trim();
+
+  if (trimmed.length === 0) {
+    return prefectureName;
+  }
+
+  if (!prefectureId || trimmed.startsWith(prefectureName)) {
+    return trimmed;
+  }
+
+  return `${prefectureName} ${trimmed}`;
+}

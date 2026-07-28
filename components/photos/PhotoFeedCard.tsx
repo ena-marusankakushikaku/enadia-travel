@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Heart, MapPin, MessageCircle, Sparkles } from 'lucide-react';
+import { Eye, Heart, MapPin, MapPinPlus, MessageCircle, Sparkles } from 'lucide-react';
 import type { Photo, UserProfile } from '@/types/app';
 import { formatRelativeDate } from '@/lib/format';
 import { MockPhoto } from '@/components/photos/MockPhoto';
@@ -12,6 +12,7 @@ type PhotoFeedCardProps = {
   onOpenPhoto: (photo: Photo) => void;
   onReact?: (photo: Photo) => void;
   onComment?: (photo: Photo) => void;
+  onEditLocation?: (photo: Photo) => void;
 };
 
 function getUserName(users: UserProfile[], userId: string): string {
@@ -20,6 +21,7 @@ function getUserName(users: UserProfile[], userId: string): string {
 
 export function PhotoFeedCard({
   onComment,
+  onEditLocation,
   onOpenPhoto,
   onReact,
   photo,
@@ -39,10 +41,22 @@ export function PhotoFeedCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-enadia-ink">{uploader.displayName}</p>
-            <p className="mt-1 flex items-center gap-1 text-xs text-enadia-muted">
-              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-              {photo.placeName ?? '場所未設定'}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-enadia-muted">
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                {photo.placeName ?? '場所未設定'}
+              </span>
+              {onEditLocation ? (
+                <button
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-bold text-enadia-primary transition hover:bg-slate-200"
+                  onClick={() => onEditLocation(photo)}
+                  type="button"
+                >
+                  <MapPinPlus className="h-3 w-3" aria-hidden="true" />
+                  {photo.placeName ? '場所を修正' : '場所を設定'}
+                </button>
+              ) : null}
+            </div>
           </div>
           <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-1 text-[11px] font-bold text-enadia-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />

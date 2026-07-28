@@ -38,7 +38,11 @@ export function ConquestDetail({ photos, project, userId, users }: ConquestDetai
           </div>
         </div>
       </div>
-      <JapanConquestMap entries={entries} onSelectPrefecture={() => undefined} />
+      <JapanConquestMap
+        achievedPrefectureIds={entries.map((entry) => entry.prefectureId)}
+        caption={`${project.name}の記録がある都道府県を色分けしています。`}
+        onSelectPrefecture={() => undefined}
+      />
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-enadia-ink">記録一覧</h2>
         <Button icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => setIsOpen(true)} size="sm">
