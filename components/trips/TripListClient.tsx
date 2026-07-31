@@ -2,17 +2,19 @@
 
 import { useMemo, useState } from 'react';
 import { TripCard } from '@/components/trips/TripCard';
-import type { Photo, Trip, TripMember, UserProfile } from '@/types/app';
+import type { Trip, TripMember } from '@/types/app';
 
 export type TripListItem = {
   trip: Trip;
   members: TripMember[];
-  photos: Photo[];
+  /** この旅の写真の枚数 */
+  photoCount: number;
+  /** 表紙に出す1枚の画像URL */
+  coverImageUrl: string | null;
 };
 
 type TripListClientProps = {
   items: TripListItem[];
-  users: UserProfile[];
 };
 
 /** 日付が取れないときのグループ用（年不明として一番下にまとめる） */
@@ -23,7 +25,7 @@ function getYear(trip: Trip): number {
   return Number.isNaN(parsed.getTime()) ? UNKNOWN_YEAR : parsed.getFullYear();
 }
 
-export function TripListClient({ items, users }: TripListClientProps) {
+export function TripListClient({ items }: TripListClientProps) {
   const [hiddenTripIds, setHiddenTripIds] = useState<string[]>([]);
 
   const visibleItems = useMemo(
@@ -78,14 +80,14 @@ export function TripListClient({ items, users }: TripListClientProps) {
           </div>
 
           <div className="space-y-2">
-            {group.items.map(({ members, photos, trip }) => (
+            {group.items.map(({ coverImageUrl, members, photoCount, trip }) => (
               <TripCard
+                coverImageUrl={coverImageUrl}
                 key={trip.id}
                 members={members}
                 onDelete={(tripId) => setHiddenTripIds((ids) => [...ids, tripId])}
-                photos={photos}
+                photoCount={photoCount}
                 trip={trip}
-                users={users}
               />
             ))}
           </div>
