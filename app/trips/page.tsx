@@ -8,6 +8,7 @@ import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
 import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
 import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
+import { touchLoginStreak } from '@/lib/api/loginStreak';
 import type { UserProfile } from '@/types/app';
 
 export default async function TripsPage() {
@@ -48,10 +49,14 @@ export default async function TripsPage() {
   usersById.set(currentUser.id, currentUser);
   const users = Array.from(usersById.values());
 
+  // 画面を開いた時点で「今日も開いた」と記録する。同じ日の2回目以降は書き込まない
   const currentStats = {
-    points: ownProfileRow?.points ?? 0,
-    // Login streak isn't tracked in the DB yet; falls back to 0 until that's built.
-    loginStreakDays: 0
+    loginStreakDays: await touchLoginStreak(
+      supabase,
+      user.id,
+      ownProfileRow?.last_login_date ?? null,
+      ownProfileRow?.login_streak_days ?? 0
+    )
   };
 
   const items: TripListItem[] = trips.map((trip) => ({
@@ -68,16 +73,16 @@ export default async function TripsPage() {
           <h1 className="mt-2 text-2xl font-bold">写真から旅の価値を育てる</h1>
           <div className="mt-5 grid grid-cols-3 gap-2">
             <div className="rounded-lg bg-white/10 p-3">
-              <p className="text-[11px] text-white/62">Plan</p>
+              <p className="text-[11px] text-white/62">プラン</p>
               <p className="mt-1 text-sm font-bold uppercase">{currentUser.plan}</p>
             </div>
             <div className="rounded-lg bg-white/10 p-3">
-              <p className="text-[11px] text-white/62">Points</p>
-              <p className="mt-1 text-sm font-bold">{currentStats.points.toLocaleString()}</p>
+              <p className="text-[11px] text-white/62">写真</p>
+              <p className="mt-1 text-sm font-bold">{photos.length}枚</p>
             </div>
             <div className="rounded-lg bg-white/10 p-3">
-              <p className="text-[11px] text-white/62">Streak</p>
-              <p className="mt-1 text-sm font-bold">{currentStats.loginStreakDays} days</p>
+              <p className="text-[11px] text-white/62">連続ログイン</p>
+              <p className="mt-1 text-sm font-bold">{currentStats.loginStreakDays}日</p>
             </div>
           </div>
           <Link

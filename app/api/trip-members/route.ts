@@ -3,7 +3,9 @@ import { requireUser } from '@/lib/api/auth';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import type { TripRole } from '@/types/app';
 
-const validRoles: TripRole[] = ['owner', 'editor', 'viewer'];
+// 「閲覧のみ」(viewer)は使いどころが無いと判断したため、新しく招待するときは選べない。
+// 既存データの表示だけは残している（constants/roles.ts 参照）。
+const validRoles: TripRole[] = ['owner', 'editor'];
 
 export async function POST(request: Request) {
   const { response, supabase, user } = await requireUser();

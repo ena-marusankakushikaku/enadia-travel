@@ -2,18 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bot, Share2, UsersRound } from 'lucide-react';
+import { ArrowLeft, Bot, Pencil, Share2, UsersRound } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PhotoGrid } from '@/components/photos/PhotoGrid';
 import { PhotoDetailViewer } from '@/components/photos/PhotoDetailViewer';
 import { PhotoLocationModal } from '@/components/photos/PhotoLocationModal';
+import { PhotoDateModal } from '@/components/photos/PhotoDateModal';
 import { PhotoUploadButton } from '@/components/photos/PhotoUploadButton';
 import { TravelMap } from '@/components/trips/TravelMap';
 import { ThemeLogPanel } from '@/components/trips/ThemeLogPanel';
-import { ThemeEntryModal } from '@/components/trips/ThemeEntryModal';
 import { MemberPanel } from '@/components/trips/MemberPanel';
+import { EditTripModal } from '@/components/trips/EditTripModal';
 import { formatDateRange } from '@/lib/format';
-import { persistThemeEntry } from '@/lib/api/themeEntriesClient';
 import { canEditTrip, canManageTrip } from '@/lib/permissions';
 import type { ConquestEntry, ConquestProject, Photo, Trip, TripMember, TripRole, UserProfile } from '@/types/app';
 
@@ -49,21 +49,13 @@ export function TripDetailClient({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TripTab>('photos');
   const [viewerPhotoId, setViewerPhotoId] = useState<string | null>(null);
-  const [themeModalPhoto, setThemeModalPhoto] = useState<Photo | null>(null);
   const [locationModalPhoto, setLocationModalPhoto] = useState<Photo | null>(null);
+  const [dateModalPhoto, setDateModalPhoto] = useState<Photo | null>(null);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
+  const [isEditTripOpen, setIsEditTripOpen] = useState(false);
 
   const canAddContent = canEditTrip(currentRole);
   const canManageMembers = canManageTrip(currentRole);
-
-  async function saveThemeEntryFromMap(entry: ConquestEntry, project?: ConquestProject) {
-    const persisted = await persistThemeEntry(entry, project);
-    setThemeModalPhoto(null);
-    if (persisted) {
-      setActiveTab('theme');
-      router.refresh();
-    }
-  }
 
   return (
     <>
@@ -79,9 +71,21 @@ export function TripDetailClient({
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-xl font-bold text-enadia-ink">{trip.title}</h1>
-            <p className="mt-1 text-sm text-enadia-muted">
-              {formatDateRange(trip.startsAt, trip.endsAt)}
-              {trip.area ? ` ・ ${trip.area}` : ''}
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-enadia-muted">
+              <span>
+                {formatDateRange(trip.startsAt, trip.endsAt)}
+                {trip.area ? ` ・ ${trip.area}` : ''}
+              </span>
+              {canAddContent ? (
+                <button
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-enadia-muted transition hover:bg-slate-200"
+                  onClick={() => setIsEditTripOpen(true)}
+                  type="button"
+                >
+                  <Pencil className="h-3 w-3" aria-hidden="true" />
+                  編集
+                </button>
+              ) : null}
             </p>
             <div className="mt-2 flex items-center gap-3 text-xs font-semibold text-enadia-muted">
               <span className="inline-flex items-center gap-1">
@@ -138,15 +142,23 @@ export function TripDetailClient({
         <section className="mt-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-enadia-muted">
-              {canAddContent ? '写真をタップすると、いいね・コメント・テーマ付けができます。' : 'viewerは閲覧のみです。'}
+              {canAddContent
+                ? '写真をタップすると、いいね・コメント・テーマ付けができます。'
+                : 'あなたはこの旅を閲覧のみできます。'}
             </p>
             {canAddContent ? <PhotoUploadButton onUploaded={() => router.refresh()} tripId={trip.id} /> : null}
           </div>
 
-          <PhotoGrid currentUserId={currentUserId} onOpenPhoto={setViewerPhotoId} photos={photos} />
+          <PhotoGrid
+            currentUserId={currentUserId}
+            onOpenPhoto={setViewerPhotoId}
+            photos={photos}
+            tripEndsAt={trip.endsAt}
+            tripStartsAt={trip.startsAt}
+          />
 
           {photos.length >= 2 ? (
-            <TravelMap onAddThemeFromPhoto={canAddContent ? setThemeModalPhoto : undefined} photos={photos} />
+            <TravelMap onOpenPhoto={setViewerPhotoId} photos={photos} />
           ) : null}
         </section>
       ) : null}
@@ -177,28 +189,20 @@ export function TripDetailClient({
         </div>
       ) : null}
 
-      <ThemeEntryModal
-        initialPhoto={themeModalPhoto}
-        onClose={() => setThemeModalPhoto(null)}
-        onSave={saveThemeEntryFromMap}
-        open={themeModalPhoto !== null}
-        photos={photos}
-        projects={themeProjects}
-        tripId={trip.id}
-        userId={currentUserId}
-      />
-
       <PhotoDetailViewer
         canEdit={canAddContent}
         currentUserId={currentUserId}
         onChanged={() => router.refresh()}
         onClose={() => setViewerPhotoId(null)}
+        onEditDate={(photo) => setDateModalPhoto(photo)}
         onEditLocation={(photo) => setLocationModalPhoto(photo)}
         photoId={viewerPhotoId}
         photos={photos}
         projects={themeProjects}
         themeEntries={themeEntries}
+        tripEndsAt={trip.endsAt}
         tripId={trip.id}
+        tripStartsAt={trip.startsAt}
         users={users}
       />
 
@@ -207,6 +211,23 @@ export function TripDetailClient({
         onSaved={() => router.refresh()}
         open={locationModalPhoto !== null}
         photo={locationModalPhoto}
+      />
+
+      <EditTripModal
+        onClose={() => setIsEditTripOpen(false)}
+        onSaved={() => router.refresh()}
+        open={isEditTripOpen}
+        photos={photos}
+        trip={trip}
+      />
+
+      <PhotoDateModal
+        onClose={() => setDateModalPhoto(null)}
+        onSaved={() => router.refresh()}
+        open={dateModalPhoto !== null}
+        photo={dateModalPhoto}
+        tripEndsAt={trip.endsAt}
+        tripStartsAt={trip.startsAt}
       />
     </>
   );

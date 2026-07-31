@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       userId: user.id,
       tripId,
       photoId: photo.id,
-      prefectureId: location.prefectureId,
+      prefectureId: location.prefectureId ?? undefined,
       lat: exif.lat ?? undefined,
       lng: exif.lng ?? undefined,
       placeName: location.placeName ?? undefined,
@@ -100,7 +100,9 @@ export async function POST(request: Request) {
     {
       photo,
       // 位置情報が取れなかった場合、クライアント側で手動入力を促すために返す
-      locationDetected: location !== null
+      locationDetected: location !== null,
+      // 撮影日が取れなかった写真はアップロード日時で表示されるため、後で直せることを伝える
+      capturedAtDetected: exif.capturedAt !== null
     },
     { status: 201 }
   );

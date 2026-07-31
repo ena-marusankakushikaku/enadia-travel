@@ -29,7 +29,7 @@ export function ThemeLogPanel({ canAdd, entries, onSaved, photos, projects, user
         <p className="mt-1 text-sm text-enadia-muted">
           {canAdd
             ? '写真にテーマを付けると、ここに記録が並びます。店名や評価は「編集」から追加できます。'
-            : 'viewerは閲覧のみです。'}
+            : 'あなたはこの旅を閲覧のみできます。'}
         </p>
       </div>
 

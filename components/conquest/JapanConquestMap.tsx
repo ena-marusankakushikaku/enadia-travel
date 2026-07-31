@@ -1,6 +1,7 @@
 'use client';
 
 import { JapanMap } from '@/components/map/JapanMap';
+import { PinchZoom } from '@/components/map/PinchZoom';
 
 type JapanConquestMapProps = {
   /** 色を塗る都道府県 */
@@ -27,9 +28,9 @@ export function JapanConquestMap({ achievedPrefectureIds, caption, onSelectPrefe
         <div className="h-full rounded-full bg-enadia-primary transition-all" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-lg bg-[linear-gradient(160deg,#eef7fb_0%,#f6fbfd_100%)] p-2">
+      <PinchZoom className="mt-3">
         <JapanMap highlightedPrefectureIds={achievedPrefectureIds} onSelectPrefecture={onSelectPrefecture} />
-      </div>
+      </PinchZoom>
 
       <p className="mt-2 text-xs text-enadia-muted">{caption ?? '都道府県をタップすると記録を確認できます。'}</p>
     </section>

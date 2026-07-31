@@ -6,6 +6,8 @@ import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
 import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
 import { mapProfileRow } from '@/lib/api/profiles';
+import { collectEntryLocations } from '@/lib/conquest/progress';
+import { collectVisitedCountryCodes } from '@/constants/world';
 import type { ConquestProject, UserProfile } from '@/types/app';
 
 export default async function ConquestPage() {
@@ -35,9 +37,23 @@ export default async function ConquestPage() {
     ? mapProfileRow(profileRow)
     : { id: user.id, displayName: user.email ?? 'Traveler', avatarUrl: null, plan: 'free', homePrefectureId: null };
 
+  // 世界地図のデータは大きいので、テーマごとの国の数え上げはサーバー側で済ませる
+  const overseasCountryCountByProject: Record<string, number> = {};
+  for (const project of projects) {
+    overseasCountryCountByProject[project.id] = collectVisitedCountryCodes(
+      collectEntryLocations(project.entries, photos)
+    ).filter((code) => code !== 'JP').length;
+  }
+
   return (
-    <AppShell subtitle="テーマごとの全国制覇" title="制覇">
-      <ConquestPageClient entries={entries} photos={photos} projects={projects} users={[currentUser]} />
+    <AppShell subtitle="テーマごとの制覇" title="制覇">
+      <ConquestPageClient
+        entries={entries}
+        overseasCountryCountByProject={overseasCountryCountByProject}
+        photos={photos}
+        projects={projects}
+        users={[currentUser]}
+      />
     </AppShell>
   );
 }

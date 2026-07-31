@@ -41,7 +41,7 @@ export function ThemeEntryCard({ entry, onDelete, onEdit, photo, project, user }
             ) : null}
           </div>
           <p className="mt-2 text-xs text-enadia-muted">
-            {getPrefectureName(entry.prefectureId)} / {entry.placeName ?? '地点未設定'}
+            {entry.prefectureId !== null ? getPrefectureName(entry.prefectureId) : '海外'} / {entry.placeName ?? '地点未設定'}
           </p>
           {entry.memo ? <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-enadia-muted">{entry.memo}</p> : null}
           <div className="mt-3 flex items-center justify-between gap-2 text-xs text-enadia-muted">

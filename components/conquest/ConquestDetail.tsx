@@ -4,10 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/common/Button';
+import { clsx } from 'clsx';
 import { AddConquestEntryModal } from '@/components/conquest/AddConquestEntryModal';
 import { JapanConquestMap } from '@/components/conquest/JapanConquestMap';
+import { WorldConquestMap } from '@/components/conquest/WorldConquestMap';
 import { ThemeEntryCard } from '@/components/trips/ThemeEntryCard';
 import { EditThemeEntryModal } from '@/components/trips/EditThemeEntryModal';
+import {
+  collectEntryLocations,
+  countAchievedPrefectures,
+  PREFECTURE_TOTAL,
+  prefectureProgress
+} from '@/lib/conquest/progress';
 import type { ConquestProject, Photo, UserProfile } from '@/types/app';
 
 type ConquestDetailProps = {
@@ -15,19 +23,33 @@ type ConquestDetailProps = {
   photos: Photo[];
   users: UserProfile[];
   userId: string;
+  /** 海外で記録した国の数。日本は含まない。サーバー側で数えて渡す */
+  overseasCountryCount: number;
 };
 
-export function ConquestDetail({ photos, project, userId, users }: ConquestDetailProps) {
+type MapMode = 'japan' | 'world';
+
+export function ConquestDetail({
+  overseasCountryCount,
+  photos,
+  project,
+  userId,
+  users
+}: ConquestDetailProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mapMode, setMapMode] = useState<MapMode>('japan');
 
   const entries = project.entries;
   const editingEntry = entries.find((entry) => entry.id === editingEntryId) ?? null;
-  const prefectureCount = new Set(entries.map((entry) => entry.prefectureId)).size;
-  const progress = Math.round((prefectureCount / 47) * 100);
+  const prefectureCount = countAchievedPrefectures(entries);
+  const progress = prefectureProgress(entries);
+  const achievedPrefectureIds = entries
+    .map((entry) => entry.prefectureId)
+    .filter((id): id is number => id !== null);
 
   async function deleteEntry(entryId: string) {
     if (deletingId) {
@@ -64,23 +86,59 @@ export function ConquestDetail({ photos, project, userId, users }: ConquestDetai
         {project.description ? (
           <p className="mt-2 text-sm leading-relaxed text-enadia-muted">{project.description}</p>
         ) : null}
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        {/* 日本は「47県のうち何県」、海外は「何か国」。単位が違うので率でまとめず並べる */}
+        <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-2xl font-bold text-enadia-ink">{progress}%</p>
-            <p className="text-xs text-enadia-muted">制覇率</p>
+            <p className="text-xs text-enadia-muted">日本の制覇率</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-2xl font-bold text-enadia-ink">{prefectureCount}</p>
-            <p className="text-xs text-enadia-muted">達成都道府県</p>
+            <p className="text-xs text-enadia-muted">達成 / {PREFECTURE_TOTAL}県</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-2xl font-bold text-enadia-ink">{overseasCountryCount}</p>
+            <p className="text-xs text-enadia-muted">海外の国数</p>
           </div>
         </div>
       </div>
 
-      <JapanConquestMap
-        achievedPrefectureIds={entries.map((entry) => entry.prefectureId)}
-        caption={`${project.name}の記録がある都道府県を色分けしています。`}
-        onSelectPrefecture={() => undefined}
-      />
+      <section>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-bold text-enadia-ink">表示する地図</h2>
+          <div className="flex rounded-full border border-enadia-line bg-white p-0.5">
+            {([
+              { id: 'japan', label: '日本' },
+              { id: 'world', label: '海外' }
+            ] as { id: MapMode; label: string }[]).map((button) => (
+              <button
+                className={clsx(
+                  'rounded-full px-3 py-1 text-xs font-bold transition',
+                  mapMode === button.id ? 'bg-enadia-ink text-white' : 'text-enadia-muted hover:bg-slate-50'
+                )}
+                key={button.id}
+                onClick={() => setMapMode(button.id)}
+                type="button"
+              >
+                {button.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mapMode === 'japan' ? (
+          <JapanConquestMap
+            achievedPrefectureIds={achievedPrefectureIds}
+            caption={`${project.name}の記録がある都道府県を色分けしています。`}
+            onSelectPrefecture={() => undefined}
+          />
+        ) : (
+          <WorldConquestMap
+            caption={`${project.name}の記録がある国を色分けしています。`}
+            locations={collectEntryLocations(entries, photos)}
+          />
+        )}
+      </section>
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-enadia-ink">記録一覧</h2>

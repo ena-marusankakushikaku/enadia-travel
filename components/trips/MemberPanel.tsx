@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { InviteMemberModal } from '@/components/trips/InviteMemberModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { ASSIGNABLE_ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/constants/roles';
 import type { TripMember, TripRole, UserProfile } from '@/types/app';
 
 type MemberPanelProps = {
@@ -16,16 +17,14 @@ type MemberPanelProps = {
   onChanged: () => void;
 };
 
-const roleDescriptions: Record<TripRole, string> = {
-  owner: '招待、権限変更、削除を管理できます。',
-  editor: '写真追加とテーマログ追加ができます。',
-  viewer: '閲覧のみできます。'
-};
-
 export function MemberPanel({ canManage, currentUserId, members, onChanged, tripId, users }: MemberPanelProps) {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [localMembers, setLocalMembers] = useState(members);
   const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
+
+  // 過去に設定された「閲覧のみ」が残っている場合だけ、説明にも表示する
+  const hasLegacyViewer = localMembers.some((member) => member.role === 'viewer');
+  const shownRoles: TripRole[] = hasLegacyViewer ? [...ASSIGNABLE_ROLES, 'viewer'] : ASSIGNABLE_ROLES;
 
   async function changeRole(memberId: string, role: TripRole) {
     setPendingMemberId(memberId);
@@ -54,9 +53,9 @@ export function MemberPanel({ canManage, currentUserId, members, onChanged, trip
       <div className="rounded-lg border border-enadia-line bg-white p-4">
         <h2 className="text-base font-bold text-enadia-ink">権限の説明</h2>
         <div className="mt-3 space-y-2 text-sm text-enadia-muted">
-          {Object.entries(roleDescriptions).map(([role, description]) => (
+          {shownRoles.map((role) => (
             <p key={role}>
-              <span className="font-bold text-enadia-ink">{role}</span>: {description}
+              <span className="font-bold text-enadia-ink">{ROLE_LABELS[role]}</span>：{ROLE_DESCRIPTIONS[role]}
             </p>
           ))}
         </div>
@@ -90,7 +89,10 @@ export function MemberPanel({ canManage, currentUserId, members, onChanged, trip
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-xs text-enadia-muted">{roleDescriptions[member.role]}</p>
+                <p className="mt-1 text-xs text-enadia-muted">
+                  <span className="font-bold text-enadia-ink">{ROLE_LABELS[member.role]}</span>
+                  <span className="ml-1">{ROLE_DESCRIPTIONS[member.role]}</span>
+                </p>
               </div>
               {canManage ? (
                 <button
@@ -103,8 +105,8 @@ export function MemberPanel({ canManage, currentUserId, members, onChanged, trip
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               ) : (
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold uppercase text-enadia-muted">
-                  {member.role}
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-enadia-muted">
+                  {ROLE_LABELS[member.role]}
                 </span>
               )}
             </div>
@@ -115,9 +117,13 @@ export function MemberPanel({ canManage, currentUserId, members, onChanged, trip
                 onChange={(event) => changeRole(member.id, event.target.value as TripRole)}
                 value={member.role}
               >
-                <option value="owner">owner</option>
-                <option value="editor">editor</option>
-                <option value="viewer">viewer</option>
+                {ASSIGNABLE_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+                {/* 過去に設定された「閲覧のみ」は、選択中のときだけ表示して勝手に変わらないようにする */}
+                {member.role === 'viewer' ? <option value="viewer">{ROLE_LABELS.viewer}</option> : null}
               </select>
             ) : null}
           </article>

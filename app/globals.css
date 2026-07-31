@@ -38,3 +38,54 @@ a {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* スライドショー用。写真をゆっくり拡大・移動させて動画のように見せる */
+@keyframes enadia-kenburns {
+  from {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.22) translate3d(-2.5%, -2%, 0);
+  }
+}
+
+.animate-kenburns {
+  animation: enadia-kenburns var(--slide-duration, 6s) ease-out forwards;
+}
+
+@keyframes enadia-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-fade {
+  animation: enadia-fade-in 600ms ease-out both;
+}
+
+/* 進行中のスライドを示すバー */
+@keyframes enadia-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-slide-progress {
+  transform-origin: left;
+  animation: enadia-progress var(--slide-duration, 6s) linear forwards;
+}
+
+/* 端末側で「動きを減らす」設定がされている場合は演出を止める */
+@media (prefers-reduced-motion: reduce) {
+  .animate-kenburns,
+  .animate-slide-fade,
+  .animate-slide-progress {
+    animation: none;
+  }
+}
