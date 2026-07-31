@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { getSafeRedirectPath } from '@/lib/safe-redirect';
+import type { EmailOtpType } from '@supabase/supabase-js';
 
 function CallbackLoading() {
   return (
@@ -27,42 +28,79 @@ function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
+  const tokenHash = searchParams.get('token_hash');
+  const otpType = (searchParams.get('type') as EmailOtpType | null) ?? 'email';
   const next = getSafeRedirectPath(searchParams.get('next'));
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Googleログインからの戻りかどうか。ログイン開始時に自分で付けている目印。
+  const isOAuth = searchParams.get('flow') === 'oauth';
+  const hasCredential = Boolean(code || tokenHash);
 
-  // The exchange only runs on this explicit click, never on page load, so that
-  // automated link scanners (e.g. corporate email safe-link prefetchers) that
-  // GET this URL can't burn the single-use code before the real user does.
-  // detectSessionInUrl/isSingleton are overridden because a default client
-  // auto-consumes any `?code=` in the URL the instant it's constructed
-  // (GoTrueClient auto-initializes in its constructor), which raced with and
-  // silently burned the code before this explicit call could use it.
-  async function completeSignIn() {
-    if (!code) {
+  const [loading, setLoading] = useState(isOAuth);
+  const [error, setError] = useState<string | null>(null);
+  const startedRef = useRef(false);
+
+  // ログインの引き換え方法は2種類ある。
+  //
+  // 1. token_hash（メールのリンク）
+  //    メールを読む端末と、ログインを始めた端末が違ってもよい。
+  //    PCでログインを開始してスマホでメールを開く、という使い方は普通に起きるので、
+  //    メール経由はこちらを使う。
+  //
+  // 2. code（Googleログイン）
+  //    PKCE方式。ログインを開始したブラウザに残った符号（code verifier）と
+  //    組で使うため、同じブラウザで完結する必要がある。
+  //    Googleログインは同じブラウザ内で戻ってくるので問題ない。
+  //
+  // かつてメールのリンクにも 1 ではなく 2 を使っていたため、
+  // 別端末でメールを開くと「PKCE code verifier not found in storage」で失敗していた。
+  //
+  // どちらの方式でも、引き換えは1回しかできない。
+  // メールのリンクは、会社のメールシステム（Microsoft Defenderの「安全なリンク」など）が
+  // 本人より先にURLを開いて中身を調べることがある。ページを開いただけでは消費されないよう、
+  // メール経由のときはボタンを押してもらう。
+  //
+  // detectSessionInUrl と isSingleton を上書きしているのは、既定のクライアントが
+  // 生成された瞬間にURLの認証情報を自動で消費してしまい、この処理と競合して
+  // 無駄にしていたため（2026/7/5に長時間ハマった箇所）。
+  const completeSignIn = useCallback(async () => {
+    if (!hasCredential || startedRef.current) {
       return;
     }
 
+    startedRef.current = true;
     setLoading(true);
     setError(null);
+
     const supabase = createSupabaseBrowserClient({
       isSingleton: false,
       auth: { detectSessionInUrl: false }
     });
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (exchangeError) {
-      console.error('auth callback exchangeCodeForSession failed:', exchangeError);
+    const { error: verifyError } = tokenHash
+      ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType })
+      : await supabase.auth.exchangeCodeForSession(code as string);
+
+    if (verifyError) {
+      console.error('auth callback failed:', verifyError);
+      // 失敗したときは、もう一度押せるように戻す
+      startedRef.current = false;
       setLoading(false);
-      setError(exchangeError.message);
+      setError(verifyError.message);
       return;
     }
 
     router.replace(next);
-  }
+  }, [code, hasCredential, next, otpType, router, tokenHash]);
 
-  if (!code) {
+  // Googleログインのときは、ボタンを出さずにそのまま旅一覧まで進む
+  useEffect(() => {
+    if (isOAuth && code) {
+      void completeSignIn();
+    }
+  }, [code, completeSignIn, isOAuth]);
+
+  if (!hasCredential) {
     return (
       <AppShell subtitle="アカウント" title="ログイン">
         <section className="mx-auto max-w-xs space-y-4 py-8 text-center text-sm text-enadia-danger">
@@ -72,13 +110,32 @@ function AuthCallbackContent() {
     );
   }
 
+  // Googleログインが順調に進んでいる間は、待機中の表示だけ出す
+  if (isOAuth && error === null) {
+    return (
+      <AppShell subtitle="アカウント" title="ログイン">
+        <section className="mx-auto max-w-xs space-y-3 py-12 text-center">
+          <span
+            aria-hidden="true"
+            className="mx-auto block h-8 w-8 animate-spin rounded-full border-2 border-enadia-line border-t-enadia-primary"
+          />
+          <p className="text-sm text-enadia-muted">ログインしています…</p>
+        </section>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell subtitle="アカウント" title="ログイン">
       <section className="mx-auto max-w-xs space-y-4 py-8 text-center">
-        <p className="text-sm text-enadia-muted">下のボタンを押してログインを完了してください。</p>
+        <p className="text-sm text-enadia-muted">
+          {error
+            ? 'ログインを完了できませんでした。時間をおいて、もう一度ログインをやり直してください。'
+            : '下のボタンを押すとログインが完了します。'}
+        </p>
         {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
         <Button className="w-full" loading={loading} onClick={completeSignIn} variant="primary">
-          ログインを完了する
+          {error ? 'もう一度試す' : '続ける'}
         </Button>
       </section>
     </AppShell>

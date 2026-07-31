@@ -71,7 +71,10 @@ function LoginPageContent() {
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+        // flow=oauth を付けるのは、コールバック画面で自動ログインしてよいか判断するため。
+        // Googleからの戻りはメールを経由しないので、リンクを先読みするスキャナーに
+        // 使い捨てのコードを消費される心配がない（詳細は auth/callback のコメント）。
+        redirectTo: `${window.location.origin}/auth/callback?flow=oauth&next=${encodeURIComponent(next)}`
       }
     });
 
