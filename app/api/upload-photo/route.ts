@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const tripId = String(formData.get('tripId') ?? '');
   const file = formData.get('file');
+  const thumbnail = formData.get('thumbnail');
   const caption = formData.get('caption');
 
   if (!tripId) {
@@ -32,17 +33,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'editor role required' }, { status: 403 });
   }
 
-  // 位置情報の取得はあくまで付加価値なので、ここで失敗してもアップロード自体は成功させる
-  const exif = await extractPhotoExif(await file.arrayBuffer()).catch(() => ({
-    lat: null,
-    lng: null,
-    capturedAt: null
-  }));
+  // EXIFはブラウザ側で読み取って送ってもらう。
+  // アップロード前に画像を縮小しており、その時点でEXIFが失われるため。
+  // 送られてこなかった場合（古いクライアント等）は、ここで読み直す。
+  const exif = await resolvePhotoExif(formData, file);
   const location =
     exif.lat !== null && exif.lng !== null ? await resolveLocation(exif.lat, exif.lng).catch(() => null) : null;
 
   const extension = file.name.split('.').pop() ?? 'jpg';
-  const storagePath = `${tripId}/${crypto.randomUUID()}.${extension}`;
+  const photoId = crypto.randomUUID();
+  const storagePath = `${tripId}/${photoId}.${extension}`;
   const { error: uploadError } = await supabase.storage
     .from('trip-photos')
     .upload(storagePath, file, { contentType: file.type || 'image/jpeg' });
@@ -51,12 +51,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
+  // 一覧のグリッドではサムネイルを表示する。
+  // 失敗しても表示用の画像で代替できるので、アップロード自体は止めない。
+  let thumbnailPath: string | null = null;
+  if (thumbnail instanceof File) {
+    const candidatePath = `${tripId}/${photoId}-thumb.jpg`;
+    const { error: thumbnailError } = await supabase.storage
+      .from('trip-photos')
+      .upload(candidatePath, thumbnail, { contentType: thumbnail.type || 'image/jpeg' });
+
+    if (!thumbnailError) {
+      thumbnailPath = candidatePath;
+    }
+  }
+
   const { data: photo, error: insertError } = await supabase
     .from('photos')
     .insert({
       trip_id: tripId,
       uploaded_by: user.id,
       storage_path: storagePath,
+      thumbnail_path: thumbnailPath,
       caption: typeof caption === 'string' ? caption : null,
       lat: exif.lat,
       lng: exif.lng,
@@ -106,4 +121,32 @@ export async function POST(request: Request) {
     },
     { status: 201 }
   );
+}
+
+/**
+ * EXIFの値を決める。
+ * ブラウザから送られてきた値を優先し、無ければファイルから読み直す。
+ */
+async function resolvePhotoExif(formData: FormData, file: File) {
+  const lat = Number(formData.get('lat'));
+  const lng = Number(formData.get('lng'));
+  const capturedAt = formData.get('capturedAt');
+
+  const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lng) && formData.has('lat') && formData.has('lng');
+  const hasCapturedAt = typeof capturedAt === 'string' && capturedAt.length > 0;
+
+  if (hasCoordinates || hasCapturedAt) {
+    return {
+      lat: hasCoordinates ? lat : null,
+      lng: hasCoordinates ? lng : null,
+      capturedAt: hasCapturedAt ? capturedAt : null
+    };
+  }
+
+  // 位置情報の取得はあくまで付加価値なので、ここで失敗してもアップロード自体は成功させる
+  return extractPhotoExif(await file.arrayBuffer()).catch(() => ({
+    lat: null,
+    lng: null,
+    capturedAt: null
+  }));
 }

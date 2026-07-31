@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Bot, Pencil, Share2, UsersRound } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { PhotoGrid } from '@/components/photos/PhotoGrid';
-import { PhotoDetailViewer } from '@/components/photos/PhotoDetailViewer';
 import { PhotoLocationModal } from '@/components/photos/PhotoLocationModal';
 import { PhotoDateModal } from '@/components/photos/PhotoDateModal';
 import { PhotoUploadButton } from '@/components/photos/PhotoUploadButton';
@@ -16,6 +16,12 @@ import { EditTripModal } from '@/components/trips/EditTripModal';
 import { formatDateRange } from '@/lib/format';
 import { canEditTrip, canManageTrip } from '@/lib/permissions';
 import type { ConquestEntry, ConquestProject, Photo, Trip, TripMember, TripRole, UserProfile } from '@/types/app';
+
+// 全画面ビューアは写真をタップしたときだけ使う。最初の表示を軽くするため後から読み込む
+const PhotoDetailViewer = dynamic(
+  () => import('@/components/photos/PhotoDetailViewer').then((module) => module.PhotoDetailViewer),
+  { ssr: false }
+);
 
 type TripDetailClientProps = {
   trip: Trip;
