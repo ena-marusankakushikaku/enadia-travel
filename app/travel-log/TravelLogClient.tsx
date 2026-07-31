@@ -81,7 +81,7 @@ export function TravelLogClient({
               <MockPhoto
                 className="h-full w-full"
                 index={memorySet.photos[0]?.mockImageIndex}
-                src={memorySet.photos[0]?.imageUrl}
+                src={memorySet.photos[0]?.thumbnailUrl ?? memorySet.photos[0]?.imageUrl}
                 title={null}
               />
               <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -115,7 +115,7 @@ export function TravelLogClient({
                     <MockPhoto
                       className="h-full w-full"
                       index={photo.mockImageIndex}
-                      src={photo.imageUrl}
+                      src={photo.thumbnailUrl ?? photo.imageUrl}
                       title={null}
                     />
                   </button>
@@ -156,7 +156,7 @@ export function TravelLogClient({
                 <MockPhoto
                   className="h-14 w-14 shrink-0 rounded-lg"
                   index={tripPhotos[0]?.mockImageIndex}
-                  src={tripPhotos[0]?.imageUrl}
+                  src={tripPhotos[0]?.thumbnailUrl ?? tripPhotos[0]?.imageUrl}
                   title={null}
                 />
                 <span className="min-w-0 flex-1">
@@ -200,7 +200,7 @@ export function TravelLogClient({
                 <MockPhoto
                   className="h-full w-full"
                   index={photo.mockImageIndex}
-                  src={photo.imageUrl}
+                  src={photo.thumbnailUrl ?? photo.imageUrl}
                   title={null}
                 />
               </button>

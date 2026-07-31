@@ -116,7 +116,13 @@ export function PhotoGrid({
                     onClick={() => onOpenPhoto(photo.id)}
                     type="button"
                   >
-                    <MockPhoto className="h-full w-full" index={photo.mockImageIndex} src={photo.imageUrl} title={null} />
+                    {/* 一覧では小さい画像を使う。原寸を並べると1画面で何十MBにもなる */}
+                    <MockPhoto
+                      className="h-full w-full"
+                      index={photo.mockImageIndex}
+                      src={photo.thumbnailUrl ?? photo.imageUrl}
+                      title={null}
+                    />
 
                     {isFavorite ? (
                       <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/40 backdrop-blur">

@@ -1,8 +1,33 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/db';
-import type { Photo, PhotoComment, PhotoReaction, SuggestedTheme } from '@/types/app';
+import type { Photo, PhotoComment, PhotoReaction } from '@/types/app';
 
 type PhotoRow = Database['public']['Tables']['photos']['Row'];
+
+/**
+ * 画面に出すのに必要な列だけ。
+ * AI解析用の列（ai_tags / suggested_themes など）はどこにも表示していないので取得しない。
+ * 取得する列を絞ると、そのぶん転送量と処理時間が減る。
+ */
+export const PHOTO_SELECT_COLUMNS =
+  'id, trip_id, uploaded_by, storage_path, thumbnail_path, lat, lng, place_name, prefecture_id, confidence, caption, captured_at, created_at';
+
+export type PhotoRowLite = Pick<
+  PhotoRow,
+  | 'id'
+  | 'trip_id'
+  | 'uploaded_by'
+  | 'storage_path'
+  | 'thumbnail_path'
+  | 'lat'
+  | 'lng'
+  | 'place_name'
+  | 'prefecture_id'
+  | 'confidence'
+  | 'caption'
+  | 'captured_at'
+  | 'created_at'
+>;
 type PhotoReactionRow = Database['public']['Tables']['photo_reactions']['Row'];
 type PhotoCommentRow = Database['public']['Tables']['photo_comments']['Row'];
 
@@ -70,7 +95,7 @@ export async function createSignedPhotoUrls(
   return result;
 }
 
-export function mapPhotoRow(row: PhotoRow): Photo {
+export function mapPhotoRow(row: PhotoRowLite): Photo {
   return {
     id: row.id,
     tripId: row.trip_id,
@@ -82,13 +107,13 @@ export function mapPhotoRow(row: PhotoRow): Photo {
     placeName: row.place_name,
     prefectureId: row.prefecture_id,
     confidence: row.confidence,
-    aiTags: row.ai_tags,
+    aiTags: [],
     caption: row.caption,
     ts: row.captured_at ?? row.created_at,
     capturedAt: row.captured_at,
-    suggestedThemes: (row.suggested_themes as unknown as SuggestedTheme[] | null) ?? [],
-    aiProcessingStatus: row.ai_processing_status,
-    themeEntryCreated: row.theme_entry_created,
+    suggestedThemes: [],
+    aiProcessingStatus: 'pending',
+    themeEntryCreated: false,
     imageUrl: null,
     // いいね・コメントは attachPhotoInteractions で後から詰める
     reactions: [],
@@ -170,10 +195,30 @@ export async function attachPhotoImageUrls(supabase: SupabaseClient<Database>, p
     return photos;
   }
 
-  const urlByPath = await createSignedPhotoUrls(
-    supabase,
-    photos.map((photo) => photo.storagePath)
-  );
+  const urlByPath = await createSignedPhotoUrls(supabase, collectPhotoPaths(photos));
+  return photos.map((photo) => withPhotoUrls(photo, urlByPath));
+}
 
-  return photos.map((photo) => ({ ...photo, imageUrl: urlByPath.get(photo.storagePath) ?? null }));
+/** 表示用とサムネイルの両方の保存先を集める */
+export function collectPhotoPaths(photos: Photo[]): string[] {
+  const paths: string[] = [];
+  for (const photo of photos) {
+    paths.push(photo.storagePath);
+    if (photo.thumbnailPath) {
+      paths.push(photo.thumbnailPath);
+    }
+  }
+  return paths;
+}
+
+/**
+ * 写真に表示用URLを詰める。
+ * サムネイルが無い写真（この仕組みを入れる前にアップロードされたもの）は
+ * 表示用の画像で代用する。
+ */
+export function withPhotoUrls(photo: Photo, urlByPath: Map<string, string>): Photo {
+  const imageUrl = urlByPath.get(photo.storagePath) ?? null;
+  const thumbnailUrl = photo.thumbnailPath ? urlByPath.get(photo.thumbnailPath) ?? imageUrl : imageUrl;
+
+  return { ...photo, imageUrl, thumbnailUrl };
 }

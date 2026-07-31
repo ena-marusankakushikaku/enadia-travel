@@ -85,6 +85,8 @@ export type Photo = {
   thumbnailPath?: string | null;
   mockImageIndex?: number;
   imageUrl?: string | null;
+  /** 一覧のグリッド用の小さい画像。古い写真には無いのでその場合は imageUrl を使う */
+  thumbnailUrl?: string | null;
   lat: number | null;
   lng: number | null;
   placeName: string | null;

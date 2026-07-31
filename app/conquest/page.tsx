@@ -2,9 +2,10 @@ import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { ConquestPageClient } from '@/app/conquest/ConquestPageClient';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/api/currentUser';
 import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
-import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
+import { attachPhotoImageUrls, mapPhotoRow, PHOTO_SELECT_COLUMNS } from '@/lib/api/photos';
 import { mapProfileRow } from '@/lib/api/profiles';
 import { collectEntryLocations } from '@/lib/conquest/progress';
 import { collectVisitedCountryCodes } from '@/constants/world';
@@ -12,9 +13,7 @@ import type { ConquestProject, UserProfile } from '@/types/app';
 
 export default async function ConquestPage() {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser(supabase);
 
   if (!user) {
     redirect('/auth/login');
@@ -23,7 +22,7 @@ export default async function ConquestPage() {
   const [{ data: projectRows }, { data: entryRows }, { data: photoRows }, { data: profileRow }] = await Promise.all([
     supabase.from('conquest_projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('conquest_entries').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-    supabase.from('photos').select('*').eq('uploaded_by', user.id),
+    supabase.from('photos').select(PHOTO_SELECT_COLUMNS).eq('uploaded_by', user.id),
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
   ]);
 

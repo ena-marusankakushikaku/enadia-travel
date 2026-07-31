@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { TravelLogClient } from '@/app/travel-log/TravelLogClient';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/api/currentUser';
 import { mapTripRow } from '@/lib/api/trips';
-import { attachPhotoImageUrls, attachPhotoInteractions, mapPhotoRow } from '@/lib/api/photos';
+import { attachPhotoImageUrls, attachPhotoInteractions, mapPhotoRow, PHOTO_SELECT_COLUMNS } from '@/lib/api/photos';
 import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
 import { selectMemories } from '@/lib/memories/selectMemories';
@@ -13,9 +14,7 @@ const PHOTO_LIMIT = 1000;
 
 export default async function TravelLogPage() {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser(supabase);
 
   if (!user) {
     redirect('/auth/login');
@@ -24,7 +23,7 @@ export default async function TravelLogPage() {
   // 写真はRLSにより「自分が参加している旅のもの」だけが返る
   const [{ data: photoRows }, { data: tripRows }, { data: memberRows }, { data: projectRows }, { data: entryRows }] =
     await Promise.all([
-      supabase.from('photos').select('*').order('created_at', { ascending: false }).limit(PHOTO_LIMIT),
+      supabase.from('photos').select(PHOTO_SELECT_COLUMNS).order('created_at', { ascending: false }).limit(PHOTO_LIMIT),
       supabase.from('trips').select('*').order('created_at', { ascending: false }),
       supabase.from('trip_members').select('*'),
       supabase.from('conquest_projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),

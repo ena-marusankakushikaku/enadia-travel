@@ -6,7 +6,15 @@ import { TripDetailClient } from '@/components/trips/TripDetailClient';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
-import { attachPhotoImageUrls, attachPhotoInteractions, mapPhotoRow } from '@/lib/api/photos';
+import {
+  attachPhotoInteractions,
+  collectPhotoPaths,
+  createSignedPhotoUrls,
+  mapPhotoRow,
+  PHOTO_SELECT_COLUMNS,
+  withPhotoUrls
+} from '@/lib/api/photos';
+import { getCurrentUser } from '@/lib/api/currentUser';
 import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
 import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
@@ -20,15 +28,33 @@ type TripDetailPageProps = {
 
 export default async function TripDetailPage({ params }: TripDetailPageProps) {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser(supabase);
 
   if (!user) {
     redirect('/auth/login');
   }
 
-  const { data: tripRow } = await supabase.from('trips').select('*').eq('id', params.tripId).maybeSingle();
+  // 以前はここで7回ほど順番に問い合わせていた。1回ごとに往復が発生するため、
+  // 写真が少なくても画面が出るまで待たされていた。
+  // 依存関係のない問い合わせはまとめて同時に投げる。
+  const [
+    { data: tripRow },
+    { data: memberRows },
+    { data: photoRows },
+    { data: entryRows },
+    { data: ownProfileRow },
+    { data: projectRows },
+    { data: allEntryRows }
+  ] = await Promise.all([
+    supabase.from('trips').select('*').eq('id', params.tripId).maybeSingle(),
+    supabase.from('trip_members').select('*').eq('trip_id', params.tripId),
+    supabase.from('photos').select(PHOTO_SELECT_COLUMNS).eq('trip_id', params.tripId),
+    supabase.from('conquest_entries').select('*').eq('trip_id', params.tripId).order('created_at', { ascending: false }),
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+    supabase.from('conquest_projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    // テーマ選択で「N / 47県」を出すため、この旅に限らず自分の記録をすべて取得する
+    supabase.from('conquest_entries').select('*').eq('user_id', user.id)
+  ]);
 
   if (!tripRow) {
     return (
@@ -40,13 +66,6 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     );
   }
 
-  const [{ data: memberRows }, { data: photoRows }, { data: entryRows }, { data: ownProfileRow }] = await Promise.all([
-    supabase.from('trip_members').select('*').eq('trip_id', params.tripId),
-    supabase.from('photos').select('*').eq('trip_id', params.tripId),
-    supabase.from('conquest_entries').select('*').eq('trip_id', params.tripId).order('created_at', { ascending: false }),
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-  ]);
-
   const members = (memberRows ?? []).map(mapTripMemberRow);
   // 旅行前・1日目から順に見られるよう、撮影日の古い順に並べる。
   // 撮影日が無い写真はアップロード日時（ts）で代用する。
@@ -57,27 +76,28 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     if (Number.isNaN(right)) return -1;
     return left - right;
   });
-  const photosWithUrls = await attachPhotoImageUrls(supabase, photoRowsSorted);
-  const photos = await attachPhotoInteractions(supabase, photosWithUrls, user.id);
+  const memberUserIds = Array.from(new Set(members.map((member) => member.userId)));
+
+  // 写真の一覧が決まってから必要になるものを、まとめて同時に取る
+  const [urlByPath, photosWithInteractions, { data: publicProfileRows }] = await Promise.all([
+    createSignedPhotoUrls(supabase, collectPhotoPaths(photoRowsSorted)),
+    attachPhotoInteractions(supabase, photoRowsSorted, user.id),
+    memberUserIds.length
+      ? supabase.from('public_profiles').select('*').in('id', memberUserIds)
+      : Promise.resolve({ data: [] })
+  ]);
+
+  const photos = photosWithInteractions.map((photo) => withPhotoUrls(photo, urlByPath));
+
   const themeEntries = (entryRows ?? []).map(mapConquestEntryRow);
   const currentRole = getTripRole(params.tripId, user.id, members);
   const trip = mapTripRow(tripRow, members.map((member) => member.userId));
 
-  // テーマ選択で「N / 47県」を出すため、この旅に限らず自分の記録をすべて取得する
-  const [{ data: projectRows }, { data: allEntryRows }] = await Promise.all([
-    supabase.from('conquest_projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-    supabase.from('conquest_entries').select('*').eq('user_id', user.id)
-  ]);
   const allEntries = (allEntryRows ?? []).map(mapConquestEntryRow);
   const themeProjects = (projectRows ?? []).map((row) => ({
     ...mapConquestProjectRow(row),
     entries: allEntries.filter((entry) => entry.projectId === row.id)
   }));
-
-  const memberUserIds = Array.from(new Set(members.map((member) => member.userId)));
-  const { data: publicProfileRows } = memberUserIds.length
-    ? await supabase.from('public_profiles').select('*').in('id', memberUserIds)
-    : { data: [] };
 
   const usersById = new Map<string, UserProfile>((publicProfileRows ?? []).map((row) => [row.id, mapPublicProfileRow(row)]));
   const currentUser = ownProfileRow

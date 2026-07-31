@@ -35,7 +35,7 @@ export function PrefectureDetailSheet({
             <div className="mt-2 grid grid-cols-3 gap-2">
               {prefecturePhotos.map((photo) => (
                 <div key={photo.id}>
-                  <MockPhoto className="aspect-square w-full rounded-lg" src={photo.imageUrl} title={null} />
+                  <MockPhoto className="aspect-square w-full rounded-lg" src={photo.thumbnailUrl ?? photo.imageUrl} title={null} />
                   <p className="mt-1 line-clamp-2 text-[11px] text-enadia-muted">{photo.placeName ?? '地点未設定'}</p>
                 </div>
               ))}

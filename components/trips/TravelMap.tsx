@@ -4,10 +4,20 @@ import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { clsx } from 'clsx';
 import { Globe2, MapPin } from 'lucide-react';
-import { JapanMap } from '@/components/map/JapanMap';
 import { PinchZoom } from '@/components/map/PinchZoom';
 import { isWithinJapanBounds } from '@/lib/geo/prefectureCoordinates';
 import type { Photo } from '@/types/app';
+
+// 日本地図のデータも50KBほどある。地図は画面の下のほうにあり、
+// 開いた直後には見えないので、必要になってから読み込む
+const JapanMap = dynamic(() => import('@/components/map/JapanMap').then((module) => module.JapanMap), {
+  ssr: false,
+  loading: () => (
+    <div className="grid h-40 place-items-center rounded-lg bg-slate-50 text-xs text-enadia-muted">
+      地図を読み込んでいます…
+    </div>
+  )
+});
 
 // 世界地図のデータは大きいので、切り替えたときに初めて読み込む
 const WorldMapView = dynamic(

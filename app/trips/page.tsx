@@ -4,6 +4,7 @@ import { Gift, Plus } from 'lucide-react';
 import { AppShell } from '@/components/common/AppShell';
 import { TripListClient, type TripListItem } from '@/components/trips/TripListClient';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/api/currentUser';
 import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
 import { createSignedPhotoUrls } from '@/lib/api/photos';
@@ -12,9 +13,7 @@ import { touchLoginStreak } from '@/lib/api/loginStreak';
 
 export default async function TripsPage() {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser(supabase);
 
   if (!user) {
     redirect('/auth/login');
@@ -28,7 +27,7 @@ export default async function TripsPage() {
     supabase.from('trip_members').select('*'),
     supabase
       .from('photos')
-      .select('id, trip_id, storage_path, captured_at, created_at')
+      .select('id, trip_id, storage_path, thumbnail_path, captured_at, created_at')
       .order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
   ]);
@@ -47,7 +46,8 @@ export default async function TripsPage() {
   for (const photo of photoRows ?? []) {
     photoCountByTrip.set(photo.trip_id, (photoCountByTrip.get(photo.trip_id) ?? 0) + 1);
     if (!coverPathByTrip.has(photo.trip_id)) {
-      coverPathByTrip.set(photo.trip_id, photo.storage_path);
+      // サムネイルがあればそれを使う。無い写真（この仕組みの前のもの）は表示用で代用
+      coverPathByTrip.set(photo.trip_id, photo.thumbnail_path ?? photo.storage_path);
     }
   }
 

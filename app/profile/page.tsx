@@ -4,6 +4,7 @@ import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
 import { LogoutButton } from '@/components/profile/LogoutButton';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/api/currentUser';
 import { collectVisitedCountryCodes } from '@/constants/world';
 import { touchLoginStreak } from '@/lib/api/loginStreak';
 
@@ -17,9 +18,7 @@ function getRank(points: number): string {
 
 export default async function ProfilePage() {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser(supabase);
 
   if (!user) {
     redirect('/auth/login');
