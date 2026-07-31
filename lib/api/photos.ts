@@ -6,7 +6,69 @@ type PhotoRow = Database['public']['Tables']['photos']['Row'];
 type PhotoReactionRow = Database['public']['Tables']['photo_reactions']['Row'];
 type PhotoCommentRow = Database['public']['Tables']['photo_comments']['Row'];
 
-const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60;
+/**
+ * 写真は非公開バケットに置いているので、表示のたびに期限付きのURLを発行している。
+ *
+ * 以前はこれを画面を開くたびに作り直していた。URLが毎回変わるということは、
+ * ブラウザから見れば毎回別の画像なので、キャッシュがまったく効かず
+ * 同じ写真を何度もダウンロードし直していた。
+ *
+ * 有効期限を4時間に延ばし、発行済みのURLをサーバー側で使い回すようにした。
+ * 同じURLが返るので、2回目以降はブラウザが手元の画像をそのまま表示できる。
+ *
+ * 期限を延ばす分、URLが漏れたときに見られる時間も延びる。
+ * 旅の写真という性質と、URL自体が推測できないことを踏まえて4時間としている。
+ */
+const PHOTO_SIGNED_URL_TTL_SECONDS = 4 * 60 * 60;
+
+/** 期限切れの少し手前で作り直す（残り時間が短いURLを配らないため） */
+const URL_CACHE_TTL_MS = 3 * 60 * 60 * 1000;
+
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+/**
+ * 保存先のパスから表示用URLを作る。すでに作ってあるものは使い回す。
+ * 戻り値はパス→URLの対応表。
+ */
+export async function createSignedPhotoUrls(
+  supabase: SupabaseClient<Database>,
+  storagePaths: string[]
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const now = Date.now();
+  const missing: string[] = [];
+
+  for (const path of Array.from(new Set(storagePaths))) {
+    const cached = signedUrlCache.get(path);
+    if (cached && cached.expiresAt > now) {
+      result.set(path, cached.url);
+    } else {
+      missing.push(path);
+    }
+  }
+
+  if (missing.length === 0) {
+    return result;
+  }
+
+  const { data, error } = await supabase.storage
+    .from('trip-photos')
+    .createSignedUrls(missing, PHOTO_SIGNED_URL_TTL_SECONDS);
+
+  if (error || !data) {
+    return result;
+  }
+
+  for (const entry of data) {
+    if (!entry.signedUrl || !entry.path) {
+      continue;
+    }
+    signedUrlCache.set(entry.path, { url: entry.signedUrl, expiresAt: now + URL_CACHE_TTL_MS });
+    result.set(entry.path, entry.signedUrl);
+  }
+
+  return result;
+}
 
 export function mapPhotoRow(row: PhotoRow): Photo {
   return {
@@ -104,16 +166,14 @@ export async function attachPhotoInteractions(
 
 // trip-photos is a private bucket, so rendering requires a signed URL rather than a public one.
 export async function attachPhotoImageUrls(supabase: SupabaseClient<Database>, photos: Photo[]): Promise<Photo[]> {
-  const paths = Array.from(new Set(photos.map((photo) => photo.storagePath)));
-  if (paths.length === 0) {
+  if (photos.length === 0) {
     return photos;
   }
 
-  const { data, error } = await supabase.storage.from('trip-photos').createSignedUrls(paths, PHOTO_SIGNED_URL_TTL_SECONDS);
-  if (error || !data) {
-    return photos;
-  }
+  const urlByPath = await createSignedPhotoUrls(
+    supabase,
+    photos.map((photo) => photo.storagePath)
+  );
 
-  const urlByPath = new Map(data.filter((entry) => entry.signedUrl).map((entry) => [entry.path, entry.signedUrl]));
   return photos.map((photo) => ({ ...photo, imageUrl: urlByPath.get(photo.storagePath) ?? null }));
 }

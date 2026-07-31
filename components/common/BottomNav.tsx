@@ -44,6 +44,11 @@ export function BottomNav() {
                 )}
                 href={item.href}
                 key={item.href}
+                // フッターは常に画面に出ているので、押される前に中身を先に取っておく。
+                // これでタブの切り替えが待ち時間なしになる（スマホアプリに近い体感）。
+                // その代わり画面を開くたびに他のタブの読み込みも走るため、
+                // 利用者が増えてサーバーの負荷が気になってきたら見直す。
+                prefetch
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
                 <span>{item.label}</span>

@@ -6,10 +6,9 @@ import { TripListClient, type TripListItem } from '@/components/trips/TripListCl
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { mapTripRow } from '@/lib/api/trips';
 import { mapTripMemberRow } from '@/lib/api/tripMembers';
-import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
-import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
+import { createSignedPhotoUrls } from '@/lib/api/photos';
+import { mapProfileRow } from '@/lib/api/profiles';
 import { touchLoginStreak } from '@/lib/api/loginStreak';
-import type { UserProfile } from '@/types/app';
 
 export default async function TripsPage() {
   const supabase = createSupabaseServerClient();
@@ -21,10 +20,16 @@ export default async function TripsPage() {
     redirect('/auth/login');
   }
 
+  // 一覧に必要なのは「旅ごとの枚数」と「表紙1枚」だけ。
+  // 以前は写真の全項目を取ってすべての表示URLを発行していたため、
+  // 写真が増えるほど画面が出るまで待たされる作りになっていた。
   const [{ data: tripRows }, { data: memberRows }, { data: photoRows }, { data: ownProfileRow }] = await Promise.all([
     supabase.from('trips').select('*').order('created_at', { ascending: false }),
     supabase.from('trip_members').select('*'),
-    supabase.from('photos').select('*'),
+    supabase
+      .from('photos')
+      .select('id, trip_id, storage_path, captured_at, created_at')
+      .order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
   ]);
 
@@ -35,19 +40,23 @@ export default async function TripsPage() {
     )
   );
   const members = (memberRows ?? []).map(mapTripMemberRow);
-  const photos = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
 
-  const memberUserIds = Array.from(new Set(members.map((member) => member.userId)));
-  const { data: publicProfileRows } = memberUserIds.length
-    ? await supabase.from('public_profiles').select('*').in('id', memberUserIds)
-    : { data: [] };
+  // 旅ごとに、枚数と表紙にする1枚（いちばん新しい写真）を選ぶ
+  const photoCountByTrip = new Map<string, number>();
+  const coverPathByTrip = new Map<string, string>();
+  for (const photo of photoRows ?? []) {
+    photoCountByTrip.set(photo.trip_id, (photoCountByTrip.get(photo.trip_id) ?? 0) + 1);
+    if (!coverPathByTrip.has(photo.trip_id)) {
+      coverPathByTrip.set(photo.trip_id, photo.storage_path);
+    }
+  }
 
-  const usersById = new Map<string, UserProfile>((publicProfileRows ?? []).map((row) => [row.id, mapPublicProfileRow(row)]));
+  // 表示URLの発行は旅の数だけ。写真の枚数には影響されない
+  const coverUrlByPath = await createSignedPhotoUrls(supabase, Array.from(coverPathByTrip.values()));
+
   const currentUser = ownProfileRow
     ? mapProfileRow(ownProfileRow)
     : { id: user.id, displayName: user.email ?? 'Traveler', avatarUrl: null, plan: 'free' as const, homePrefectureId: null };
-  usersById.set(currentUser.id, currentUser);
-  const users = Array.from(usersById.values());
 
   // 画面を開いた時点で「今日も開いた」と記録する。同じ日の2回目以降は書き込まない
   const currentStats = {
@@ -59,11 +68,15 @@ export default async function TripsPage() {
     )
   };
 
-  const items: TripListItem[] = trips.map((trip) => ({
-    trip,
-    members: members.filter((member) => member.tripId === trip.id),
-    photos: photos.filter((photo) => photo.tripId === trip.id)
-  }));
+  const items: TripListItem[] = trips.map((trip) => {
+    const coverPath = coverPathByTrip.get(trip.id);
+    return {
+      trip,
+      members: members.filter((member) => member.tripId === trip.id),
+      photoCount: photoCountByTrip.get(trip.id) ?? 0,
+      coverImageUrl: coverPath ? coverUrlByPath.get(coverPath) ?? null : null
+    };
+  });
 
   return (
     <AppShell subtitle="旅管理MVP" title="旅一覧">
@@ -78,7 +91,7 @@ export default async function TripsPage() {
             </div>
             <div className="rounded-lg bg-white/10 p-3">
               <p className="text-[11px] text-white/62">写真</p>
-              <p className="mt-1 text-sm font-bold">{photos.length}枚</p>
+              <p className="mt-1 text-sm font-bold">{photoRows?.length ?? 0}枚</p>
             </div>
             <div className="rounded-lg bg-white/10 p-3">
               <p className="text-[11px] text-white/62">連続ログイン</p>
@@ -105,7 +118,7 @@ export default async function TripsPage() {
         </section>
       ) : null}
 
-      <TripListClient items={items} users={users} />
+      <TripListClient items={items} />
     </AppShell>
   );
 }

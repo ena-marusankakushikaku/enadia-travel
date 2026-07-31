@@ -42,9 +42,14 @@ export async function middleware(request: NextRequest) {
     }
   });
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  // getUser() は画面を1つ移動するたびにSupabaseの認証サーバーへ問い合わせる。
+  // 日本からの往復が毎回積み重なり、タブを押してから画面が出るまでの待ち時間になっていた。
+  //
+  // getClaims() は、Supabase側で「非対称鍵（asymmetric signing keys）」を有効にしていれば
+  // 通信せずにこのサーバーの中だけでトークンを検証できる。
+  // 有効にしていない場合は従来通り問い合わせに行くだけなので、入れて損はない。
+  const { data, error: claimsError } = await supabase.auth.getClaims();
+  const user = claimsError ? null : data?.claims ?? null;
 
   if (!user) {
     const redirectUrl = request.nextUrl.clone();

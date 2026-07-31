@@ -2,20 +2,23 @@
 
 import Link from 'next/link';
 import { Trash2, UsersRound, Image as ImageIcon, ChevronRight } from 'lucide-react';
-import type { Photo, Trip, TripMember, UserProfile } from '@/types/app';
+import type { Trip, TripMember } from '@/types/app';
 import { formatDateRange } from '@/lib/format';
 import { MockPhoto } from '@/components/photos/MockPhoto';
 
 type TripCardProps = {
   trip: Trip;
-  photos: Photo[];
+  /** この旅の写真の枚数 */
+  photoCount: number;
+  /** 表紙に出す1枚の画像URL。写真が無ければ null */
+  coverImageUrl: string | null;
   members: TripMember[];
-  users: UserProfile[];
   onDelete?: (tripId: string) => void;
 };
 
-export function TripCard({ members, onDelete, photos, trip }: TripCardProps) {
-  const coverPhoto = photos.find((photo) => photo.id === trip.coverPhotoId) ?? photos[0];
+// 一覧では写真の中身は使わないので、枚数と表紙1枚だけを受け取る。
+// 以前はこの旅の写真をすべて受け取っており、写真が増えるほど表示が重くなっていた。
+export function TripCard({ coverImageUrl, members, onDelete, photoCount, trip }: TripCardProps) {
 
   return (
     <article className="overflow-hidden rounded-lg border border-enadia-line bg-white shadow-sm transition hover:border-enadia-primary">
@@ -23,8 +26,8 @@ export function TripCard({ members, onDelete, photos, trip }: TripCardProps) {
         <Link className="shrink-0" href={`/trips/${trip.id}`}>
           <MockPhoto
             className="h-16 w-16 rounded-lg"
-            index={coverPhoto?.mockImageIndex ?? 0}
-            src={coverPhoto?.imageUrl}
+            index={0}
+            src={coverImageUrl}
             title={null}
           />
         </Link>
@@ -38,7 +41,7 @@ export function TripCard({ members, onDelete, photos, trip }: TripCardProps) {
           <div className="mt-1.5 flex items-center gap-3 text-[11px] font-semibold text-enadia-muted">
             <span className="inline-flex items-center gap-1">
               <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {photos.length}
+              {photoCount}
             </span>
             <span className="inline-flex items-center gap-1">
               <UsersRound className="h-3.5 w-3.5" aria-hidden="true" />
