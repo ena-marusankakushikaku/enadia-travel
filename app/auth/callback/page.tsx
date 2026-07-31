@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -25,7 +25,6 @@ export default function AuthCallbackPage() {
 }
 
 function AuthCallbackContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
@@ -90,8 +89,11 @@ function AuthCallbackContent() {
       return;
     }
 
-    router.replace(next);
-  }, [code, hasCredential, next, otpType, router, tokenHash]);
+    // router.replace ではなく画面全体を読み込み直す。
+    // ログイン直後はブラウザに書かれたばかりのセッションが
+    // サーバー側（middleware）にまだ渡らず、ログイン画面へ引き戻されることがあるため。
+    window.location.replace(next);
+  }, [code, hasCredential, next, otpType, tokenHash]);
 
   // Googleログインのときは、ボタンを出さずにそのまま旅一覧まで進む
   useEffect(() => {
