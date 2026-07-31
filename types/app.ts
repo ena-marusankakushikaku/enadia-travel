@@ -144,7 +144,8 @@ export type ConquestEntry = {
   userId: string;
   tripId: string | null;
   photoId: string | null;
-  prefectureId: number;
+  /** 日本国内のときだけ入る。海外の記録は lat/lng から国を判定する */
+  prefectureId: number | null;
   title: string;
   memo: string | null;
   rating: number | null;

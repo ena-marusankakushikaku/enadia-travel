@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
+import { ASSIGNABLE_ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/constants/roles';
 import type { TripRole } from '@/types/app';
 
 type InviteMemberModalProps = {
@@ -14,7 +15,7 @@ type InviteMemberModalProps = {
 
 export function InviteMemberModal({ onClose, onInvited, open, tripId }: InviteMemberModalProps) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<TripRole>('viewer');
+  const [role, setRole] = useState<TripRole>('editor');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,11 +58,21 @@ export function InviteMemberModal({ onClose, onInvited, open, tripId }: InviteMe
             value={email}
           />
         </label>
-        <select className="h-11 w-full rounded-lg border border-enadia-line bg-white px-3" value={role} onChange={(event) => setRole(event.target.value as TripRole)}>
-          <option value="viewer">viewer</option>
-          <option value="editor">editor</option>
-          <option value="owner">owner</option>
-        </select>
+        <label className="block">
+          <span className="text-sm font-bold text-enadia-ink">権限</span>
+          <select
+            className="mt-2 h-11 w-full rounded-lg border border-enadia-line bg-white px-3"
+            onChange={(event) => setRole(event.target.value as TripRole)}
+            value={role}
+          >
+            {ASSIGNABLE_ROLES.map((assignable) => (
+              <option key={assignable} value={assignable}>
+                {ROLE_LABELS[assignable]}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1.5 block text-xs text-enadia-muted">{ROLE_DESCRIPTIONS[role]}</span>
+        </label>
         {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
         <Button className="w-full" disabled={!email.trim()} loading={loading} onClick={invite}>
           招待する

@@ -8,6 +8,8 @@ import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
 import { attachPhotoImageUrls, mapPhotoRow } from '@/lib/api/photos';
 import { mapProfileRow } from '@/lib/api/profiles';
+import { collectEntryLocations } from '@/lib/conquest/progress';
+import { collectVisitedCountryCodes } from '@/constants/world';
 import type { UserProfile } from '@/types/app';
 
 type ConquestDetailPageProps = {
@@ -59,9 +61,20 @@ export default async function ConquestDetailPage({ params }: ConquestDetailPageP
     ? mapProfileRow(profileRow)
     : { id: user.id, displayName: user.email ?? 'Traveler', avatarUrl: null, plan: 'free', homePrefectureId: null };
 
+  // 世界地図のデータは大きいので、国の数え上げはサーバー側で済ませる
+  const overseasCountryCount = collectVisitedCountryCodes(collectEntryLocations(entries, photos)).filter(
+    (code) => code !== 'JP'
+  ).length;
+
   return (
     <AppShell subtitle="制覇詳細" title={project.name}>
-      <ConquestDetail photos={photos} project={project} userId={user.id} users={[currentUser]} />
+      <ConquestDetail
+        overseasCountryCount={overseasCountryCount}
+        photos={photos}
+        project={project}
+        userId={user.id}
+        users={[currentUser]}
+      />
     </AppShell>
   );
 }

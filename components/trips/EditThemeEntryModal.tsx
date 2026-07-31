@@ -93,7 +93,7 @@ export function EditThemeEntryModal({ entry, onClose, onSaved, open, project }: 
           </p>
           <p className="mt-1.5 flex items-center gap-1 text-xs text-enadia-muted">
             <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            {getPrefectureName(entry?.prefectureId)} / {entry?.placeName ?? '地点未設定'}
+            {entry?.prefectureId ? getPrefectureName(entry.prefectureId) : '海外'} / {entry?.placeName ?? '地点未設定'}
           </p>
           <p className="mt-1 text-[11px] text-enadia-muted">
             場所は写真の情報と連動しています。変更したいときは写真側で「場所を修正」してください。

@@ -3,6 +3,8 @@ export type UploadResult = {
   failed: number;
   /** 位置情報を自動で取得できた枚数 */
   located: number;
+  /** 撮影日が写真に残っておらず、アップロード日時で代用した枚数 */
+  undated: number;
   firstError: string | null;
 };
 
@@ -16,7 +18,7 @@ export async function uploadPhotos(
   files: File[],
   onProgress?: (done: number, total: number) => void
 ): Promise<UploadResult> {
-  const result: UploadResult = { uploaded: 0, failed: 0, located: 0, firstError: null };
+  const result: UploadResult = { uploaded: 0, failed: 0, located: 0, undated: 0, firstError: null };
 
   for (const [index, file] of files.entries()) {
     const formData = new FormData();
@@ -25,12 +27,19 @@ export async function uploadPhotos(
 
     try {
       const response = await fetch('/api/upload-photo', { method: 'POST', body: formData });
-      const data = (await response.json()) as { error?: string; locationDetected?: boolean };
+      const data = (await response.json()) as {
+        error?: string;
+        locationDetected?: boolean;
+        capturedAtDetected?: boolean;
+      };
 
       if (response.ok) {
         result.uploaded += 1;
         if (data.locationDetected) {
           result.located += 1;
+        }
+        if (data.capturedAtDetected === false) {
+          result.undated += 1;
         }
       } else {
         result.failed += 1;

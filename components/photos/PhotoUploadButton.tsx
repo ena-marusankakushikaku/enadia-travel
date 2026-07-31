@@ -14,6 +14,7 @@ export function PhotoUploadButton({ onUploaded, tripId }: PhotoUploadButtonProps
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [dateHint, setDateHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleFiles(files: File[]) {
@@ -23,6 +24,7 @@ export function PhotoUploadButton({ onUploaded, tripId }: PhotoUploadButtonProps
 
     setError(null);
     setMessage(null);
+    setDateHint(null);
     setProgress({ done: 0, total: files.length });
 
     const result = await uploadPhotos(tripId, files, (done, total) => setProgress({ done, total }));
@@ -38,6 +40,13 @@ export function PhotoUploadButton({ onUploaded, tripId }: PhotoUploadButtonProps
         `${result.uploaded}枚を追加しました` +
           (result.located > 0 ? `（${result.located}枚に場所が入りました）` : '')
       );
+
+      if (result.undated > 0) {
+        setDateHint(
+          `${result.undated}枚は撮影日が残っていないため、アップロード日で表示しています。写真を開いて「撮影日を修正」から、旅の何日目かを選べます。`
+        );
+      }
+
       onUploaded?.();
     }
   }
@@ -68,6 +77,11 @@ export function PhotoUploadButton({ onUploaded, tripId }: PhotoUploadButtonProps
         {isUploading ? `${progress.done} / ${progress.total} 枚` : '写真を追加'}
       </Button>
       {message ? <p className="text-xs text-enadia-primary">{message}</p> : null}
+      {dateHint ? (
+        <p className="rounded-lg bg-amber-50 px-2 py-1.5 text-left text-xs leading-relaxed text-amber-700">
+          {dateHint}
+        </p>
+      ) : null}
       {error ? <p className="text-xs text-enadia-danger">{error}</p> : null}
     </div>
   );

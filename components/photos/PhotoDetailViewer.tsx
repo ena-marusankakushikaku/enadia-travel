@@ -17,7 +17,9 @@ import { clsx } from 'clsx';
 import { MockPhoto } from '@/components/photos/MockPhoto';
 import { Modal } from '@/components/common/Modal';
 import { getPrefectureName } from '@/constants/japan';
+import { getTripDayInfo } from '@/lib/trips/tripDay';
 import { persistThemeEntry } from '@/lib/api/themeEntriesClient';
+import { countAchievedPrefectures, PREFECTURE_TOTAL } from '@/lib/conquest/progress';
 import type { ConquestEntry, ConquestProject, Photo, UserProfile } from '@/types/app';
 
 type PhotoDetailViewerProps = {
@@ -30,8 +32,11 @@ type PhotoDetailViewerProps = {
   projects: ConquestProject[];
   themeEntries: ConquestEntry[];
   tripId: string;
+  tripStartsAt: string;
+  tripEndsAt: string;
   onChanged: () => void;
   onEditLocation: (photo: Photo) => void;
+  onEditDate: (photo: Photo) => void;
 };
 
 function getUserName(users: UserProfile[], userId: string): string {
@@ -58,12 +63,15 @@ export function PhotoDetailViewer({
   currentUserId,
   onChanged,
   onClose,
+  onEditDate,
   onEditLocation,
   photoId,
   photos,
   projects,
   themeEntries,
+  tripEndsAt,
   tripId,
+  tripStartsAt,
   users
 }: PhotoDetailViewerProps) {
   // サーバーから届いた内容を土台に、操作直後の見た目だけ先に更新する
@@ -307,7 +315,7 @@ export function PhotoDetailViewer({
       userId: currentUserId,
       tripId,
       photoId: activePhoto.id,
-      prefectureId: activePhoto.prefectureId ?? 0,
+      prefectureId: activePhoto.prefectureId,
       title: activePhoto.placeName ?? project.name,
       memo: null,
       rating: null,
@@ -322,7 +330,7 @@ export function PhotoDetailViewer({
     setSavingThemeId(null);
 
     if (!persisted) {
-      setError('テーマの追加に失敗しました。写真に都道府県が設定されているか確認してください。');
+      setError('テーマの追加に失敗しました。写真に場所が設定されているか確認してください。');
       return;
     }
 
@@ -345,7 +353,15 @@ export function PhotoDetailViewer({
     }
   }
 
-  const hasPrefecture = activePhoto.prefectureId !== null;
+  // 都道府県、または座標のどちらかがあればテーマを付けられる（海外の写真は座標のみ）
+  const hasLocation =
+    activePhoto.prefectureId !== null || (activePhoto.lat !== null && activePhoto.lng !== null);
+  const isOverseas = activePhoto.prefectureId === null && activePhoto.lat !== null && activePhoto.lng !== null;
+  const tripDayLabel = getTripDayInfo(
+    activePhoto.capturedAt ?? activePhoto.ts,
+    tripStartsAt,
+    tripEndsAt
+  ).label;
 
   return (
     <>
@@ -413,24 +429,38 @@ export function PhotoDetailViewer({
         </div>
 
         <section className="safe-bottom max-h-[52dvh] overflow-y-auto border-t border-white/10 bg-slate-950 px-4 pb-4 pt-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="flex items-center gap-1.5 text-sm font-semibold">
-                <MapPin className="h-4 w-4 shrink-0 text-white/60" aria-hidden="true" />
-                <span className="truncate">{activePhoto.placeName ?? '場所未設定'}</span>
+          <div>
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
+              <MapPin className="h-4 w-4 shrink-0 text-white/60" aria-hidden="true" />
+              <span className="truncate">{activePhoto.placeName ?? '場所未設定'}</span>
+            </p>
+            <p className="mt-1 text-xs text-white/55">
+              {activePhoto.prefectureId !== null ? getPrefectureName(activePhoto.prefectureId) : isOverseas ? '海外' : '場所未設定'} ・ {tripDayLabel ? `${tripDayLabel} ・ ` : ''}
+              {formatDateTime(activePhoto.capturedAt ?? activePhoto.ts)}
+            </p>
+            {activePhoto.capturedAt === null ? (
+              <p className="mt-1 text-[11px] text-amber-300/90">
+                撮影日が残っていないため、アップロード日を表示しています
               </p>
-              <p className="mt-1 text-xs text-white/55">
-                {getPrefectureName(activePhoto.prefectureId)} ・ {formatDateTime(activePhoto.capturedAt ?? activePhoto.ts)}
-              </p>
-            </div>
+            ) : null}
+
             {canEdit ? (
-              <button
-                className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold transition hover:bg-white/20"
-                onClick={() => onEditLocation(activePhoto)}
-                type="button"
-              >
-                場所を{activePhoto.placeName ? '修正' : '設定'}
-              </button>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button
+                  className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold transition hover:bg-white/20"
+                  onClick={() => onEditLocation(activePhoto)}
+                  type="button"
+                >
+                  場所を{activePhoto.placeName ? '修正' : '設定'}
+                </button>
+                <button
+                  className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold transition hover:bg-white/20"
+                  onClick={() => onEditDate(activePhoto)}
+                  type="button"
+                >
+                  撮影日を{activePhoto.capturedAt ? '修正' : '設定'}
+                </button>
+              </div>
             ) : null}
           </div>
 
@@ -577,9 +607,9 @@ export function PhotoDetailViewer({
         title="テーマを付ける"
       >
         <div className="space-y-3">
-          {!hasPrefecture ? (
+          {!hasLocation ? (
             <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-              この写真には都道府県が設定されていません。先に「場所を設定」から都道府県を選んでください。
+              この写真には場所が設定されていません。先に「場所を修正」から場所を設定してください。
             </p>
           ) : null}
 
@@ -596,11 +626,11 @@ export function PhotoDetailViewer({
                   <button
                     className={clsx(
                       'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition',
-                      alreadyTagged || !hasPrefecture
+                      alreadyTagged || !hasLocation
                         ? 'border-enadia-line bg-slate-50 opacity-50'
                         : 'border-enadia-line bg-white hover:border-enadia-primary'
                     )}
-                    disabled={alreadyTagged || !hasPrefecture || savingThemeId !== null}
+                    disabled={alreadyTagged || !hasLocation || savingThemeId !== null}
                     key={project.id}
                     onClick={() => addThemeTag(project)}
                     type="button"
@@ -609,7 +639,7 @@ export function PhotoDetailViewer({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-bold text-enadia-ink">{project.name}</span>
                       <span className="block text-xs text-enadia-muted">
-                        {alreadyTagged ? 'この写真に設定済み' : `${new Set(project.entries.map((entry) => entry.prefectureId)).size} / 47 県`}
+                        {alreadyTagged ? 'この写真に設定済み' : `日本 ${countAchievedPrefectures(project.entries)} / ${PREFECTURE_TOTAL}県 ・ 記録 ${project.entries.length}件`}
                       </span>
                     </span>
                     {savingThemeId === project.id ? (

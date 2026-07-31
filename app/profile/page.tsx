@@ -4,6 +4,8 @@ import { AppShell } from '@/components/common/AppShell';
 import { Button } from '@/components/common/Button';
 import { LogoutButton } from '@/components/profile/LogoutButton';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { collectVisitedCountryCodes } from '@/constants/world';
+import { touchLoginStreak } from '@/lib/api/loginStreak';
 
 function getRank(points: number): string {
   if (points >= 1000) return 'レジェンド旅人';
@@ -29,28 +31,44 @@ export default async function ProfilePage() {
     { data: entryRows },
     { data: projectRows },
     { data: consentRows },
-    { data: photoRows }
+    { data: photoRows },
+    { count: favoriteCount }
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('trip_members').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('conquest_entries').select('prefecture_id').eq('user_id', user.id),
     supabase.from('conquest_projects').select('id').eq('user_id', user.id),
     supabase.from('latest_user_consents').select('*').eq('user_id', user.id),
-    supabase.from('photos').select('prefecture_id').eq('uploaded_by', user.id)
+    supabase.from('photos').select('prefecture_id, lat, lng').eq('uploaded_by', user.id),
+    supabase
+      .from('photo_reactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('reaction_type', 'heart')
   ]);
 
   const displayName = profileRow?.display_name || user.email || 'Traveler';
   const plan = profileRow?.plan ?? 'free';
   const points = profileRow?.points ?? 0;
-  // Login streak isn't tracked in the DB yet; falls back to 0 until that's built.
-  const loginStreakDays = 0;
 
+  // 画面を開いた時点で「今日も開いた」と記録する。同じ日の2回目以降は書き込まない
+  const loginStreakDays = await touchLoginStreak(
+    supabase,
+    user.id,
+    profileRow?.last_login_date ?? null,
+    profileRow?.login_streak_days ?? 0
+  );
+
+  const photos = photoRows ?? [];
   const userTripCount = tripCount ?? 0;
+  const photoCount = photos.length;
   const conquestProjectCount = (projectRows ?? []).length;
+  const themeEntryCount = (entryRows ?? []).length;
   const visitedPrefectureCount = new Set(
-    (photoRows ?? []).map((photo) => photo.prefecture_id).filter((id): id is number => id !== null)
+    photos.map((photo) => photo.prefecture_id).filter((id): id is number => id !== null)
   ).size;
-  const achievedPrefectureCount = new Set((entryRows ?? []).map((entry) => entry.prefecture_id)).size;
+  // 国はDBに持たず、写真の緯度経度から地図データで判定する
+  const visitedCountryCount = collectVisitedCountryCodes(photos).length;
   const consents = consentRows ?? [];
 
   return (
@@ -67,13 +85,20 @@ export default async function ProfilePage() {
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
+          {/*
+            数字は単位を付けずにそろえる。
+            「ポイント」は貯まる仕組みが無く、「達成県数」は「訪問県数」との違いが伝わらなかったため外した。
+            代わりに、自分の記録量が一目で分かる項目に置き換えている。
+          */}
           {[
             ['旅の数', userTripCount],
+            ['写真の数', photoCount],
             ['訪問県数', visitedPrefectureCount],
-            ['ポイント', points.toLocaleString()],
-            ['連続ログイン', `${loginStreakDays}日`],
+            ['訪問国数', visitedCountryCount],
             ['制覇テーマ', conquestProjectCount],
-            ['達成県数', achievedPrefectureCount]
+            ['テーマ記録', themeEntryCount],
+            ['お気に入り', favoriteCount ?? 0],
+            ['連続ログイン日数', loginStreakDays]
           ].map(([label, value]) => (
             <div className="rounded-lg bg-slate-50 p-3" key={label}>
               <p className="text-xl font-bold text-enadia-ink">{value}</p>

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api/auth';
 import { insertTourismEvent } from '@/lib/tourism-events';
 import { formatPlaceName, MAP_PREFECTURES } from '@/constants/japan';
-import { PREFECTURE_COORDINATES } from '@/lib/geo/prefectureCoordinates';
+import { isWithinJapanBounds, PREFECTURE_COORDINATES } from '@/lib/geo/prefectureCoordinates';
 
 /**
  * GPS情報を持たない写真に、手動で場所（都道府県・地点名）を設定する。
@@ -17,6 +17,9 @@ export async function POST(request: Request) {
     photoId?: string;
     prefectureId?: number;
     placeName?: string | null;
+    /** 地名検索の候補から選んだ場合の座標。県庁所在地ではなく実際の場所にピンを置ける */
+    lat?: number | null;
+    lng?: number | null;
   };
 
   if (!body.photoId) {
@@ -38,12 +41,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '写真が見つかりません。' }, { status: 404 });
   }
 
-  // EXIFで実座標が入っている写真は、その座標をそのまま活かす。
-  // 座標が無い写真は、地図に出せるよう県庁所在地の座標で代用する（確度は低めに記録）。
-  const hasRealCoordinates = current.lat !== null && current.lng !== null;
+  // どの座標を使うかは、確からしい順に決める。
+  // 1. 地名検索の候補から選んだ座標（ユーザーが明示的にその場所だと言っている）
+  // 2. EXIFに入っていた座標
+  // 3. どちらも無ければ県庁所在地で代用（地図にピンは出るが、位置は県単位の目安）
+  const pickedLat = typeof body.lat === 'number' ? body.lat : null;
+  const pickedLng = typeof body.lng === 'number' ? body.lng : null;
+  const hasPickedCoordinates =
+    pickedLat !== null && pickedLng !== null && isWithinJapanBounds(pickedLat, pickedLng);
+  const hasExifCoordinates = current.lat !== null && current.lng !== null;
   const fallbackCoordinate = PREFECTURE_COORDINATES.find((item) => item.id === prefectureId);
-  const lat = hasRealCoordinates ? current.lat : fallbackCoordinate?.lat ?? null;
-  const lng = hasRealCoordinates ? current.lng : fallbackCoordinate?.lng ?? null;
+
+  let lat: number | null;
+  let lng: number | null;
+  let confidence: number;
+
+  if (hasPickedCoordinates) {
+    lat = pickedLat;
+    lng = pickedLng;
+    confidence = 0.9;
+  } else if (hasExifCoordinates) {
+    lat = current.lat;
+    lng = current.lng;
+    confidence = 1;
+  } else {
+    lat = fallbackCoordinate?.lat ?? null;
+    lng = fallbackCoordinate?.lng ?? null;
+    confidence = 0.5;
+  }
 
   const placeName = formatPlaceName(prefectureId, typeof body.placeName === 'string' ? body.placeName : null);
 
@@ -54,7 +79,7 @@ export async function POST(request: Request) {
       place_name: placeName,
       lat,
       lng,
-      confidence: hasRealCoordinates ? 1 : 0.5
+      confidence
     })
     .eq('id', body.photoId)
     .select()

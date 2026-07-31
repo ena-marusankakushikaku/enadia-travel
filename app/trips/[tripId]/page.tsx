@@ -11,6 +11,7 @@ import { mapProfileRow, mapPublicProfileRow } from '@/lib/api/profiles';
 import { mapConquestProjectRow } from '@/lib/api/conquestProjects';
 import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
 import { getTripRole } from '@/lib/permissions';
+import { getRoleLabel } from '@/constants/roles';
 import type { UserProfile } from '@/types/app';
 
 type TripDetailPageProps = {
@@ -41,13 +42,22 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
 
   const [{ data: memberRows }, { data: photoRows }, { data: entryRows }, { data: ownProfileRow }] = await Promise.all([
     supabase.from('trip_members').select('*').eq('trip_id', params.tripId),
-    supabase.from('photos').select('*').eq('trip_id', params.tripId).order('captured_at', { ascending: false }),
+    supabase.from('photos').select('*').eq('trip_id', params.tripId),
     supabase.from('conquest_entries').select('*').eq('trip_id', params.tripId).order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
   ]);
 
   const members = (memberRows ?? []).map(mapTripMemberRow);
-  const photosWithUrls = await attachPhotoImageUrls(supabase, (photoRows ?? []).map(mapPhotoRow));
+  // 旅行前・1日目から順に見られるよう、撮影日の古い順に並べる。
+  // 撮影日が無い写真はアップロード日時（ts）で代用する。
+  const photoRowsSorted = (photoRows ?? []).map(mapPhotoRow).sort((a, b) => {
+    const left = new Date(a.ts).getTime();
+    const right = new Date(b.ts).getTime();
+    if (Number.isNaN(left)) return 1;
+    if (Number.isNaN(right)) return -1;
+    return left - right;
+  });
+  const photosWithUrls = await attachPhotoImageUrls(supabase, photoRowsSorted);
   const photos = await attachPhotoInteractions(supabase, photosWithUrls, user.id);
   const themeEntries = (entryRows ?? []).map(mapConquestEntryRow);
   const currentRole = getTripRole(params.tripId, user.id, members);
@@ -76,7 +86,7 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
   usersById.set(currentUser.id, currentUser);
 
   return (
-    <AppShell subtitle={currentRole ? `${currentRole} role` : 'no member role'} title="旅詳細">
+    <AppShell subtitle={getRoleLabel(currentRole)} title="旅詳細">
       <TripDetailClient
         currentRole={currentRole}
         currentUserId={user.id}

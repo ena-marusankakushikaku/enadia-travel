@@ -1,19 +1,37 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { MapPin, Plus } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { clsx } from 'clsx';
+import { Globe2, MapPin } from 'lucide-react';
 import { JapanMap } from '@/components/map/JapanMap';
-import { getPrefectureName } from '@/constants/japan';
+import { PinchZoom } from '@/components/map/PinchZoom';
+import { isWithinJapanBounds } from '@/lib/geo/prefectureCoordinates';
 import type { Photo } from '@/types/app';
+
+// 世界地図のデータは大きいので、切り替えたときに初めて読み込む
+const WorldMapView = dynamic(
+  () => import('@/components/map/WorldMapView').then((module) => module.WorldMapView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid h-40 place-items-center rounded-lg bg-slate-50 text-xs text-enadia-muted">
+        世界地図を読み込んでいます…
+      </div>
+    )
+  }
+);
 
 type TravelMapProps = {
   photos: Photo[];
-  onAddThemeFromPhoto?: (photo: Photo) => void;
+  /** ピンをタップしたときに開く写真。写真タブのグリッドと同じビューアを使う */
+  onOpenPhoto?: (photoId: string) => void;
 };
 
 type GeoPhoto = Photo & { lat: number; lng: number };
+type MapMode = 'japan' | 'world';
 
-export function TravelMap({ onAddThemeFromPhoto, photos }: TravelMapProps) {
+export function TravelMap({ onOpenPhoto, photos }: TravelMapProps) {
   const geoPhotos = useMemo(
     () =>
       photos
@@ -22,8 +40,16 @@ export function TravelMap({ onAddThemeFromPhoto, photos }: TravelMapProps) {
     [photos]
   );
 
-  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
-  const selectedPhoto = geoPhotos.find((photo) => photo.id === selectedPhotoId) ?? geoPhotos[0];
+  // 日本の外で撮った写真があるかどうか。地図の初期表示を決めるのに使う
+  const hasOverseasPhoto = useMemo(
+    () => geoPhotos.some((photo) => !isWithinJapanBounds(photo.lat, photo.lng)),
+    [geoPhotos]
+  );
+
+  const [mode, setMode] = useState<MapMode | null>(null);
+  const activeMode: MapMode = mode ?? (hasOverseasPhoto ? 'world' : 'japan');
+
+  const [visitedCountryCodes, setVisitedCountryCodes] = useState<string[]>([]);
 
   const markers = useMemo(
     () => geoPhotos.map((photo) => ({ id: photo.id, lat: photo.lat, lng: photo.lng })),
@@ -46,59 +72,77 @@ export function TravelMap({ onAddThemeFromPhoto, photos }: TravelMapProps) {
     );
   }
 
+  // 「日本」の対になる言葉としては「世界」より「海外」のほうが自然
+  const modeButtons: { id: MapMode; label: string }[] = [
+    { id: 'japan', label: '日本' },
+    { id: 'world', label: '海外' }
+  ];
+
   return (
     <section className="rounded-lg border border-enadia-line bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <MapPin className="h-4 w-4 text-enadia-primary" aria-hidden="true" />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {activeMode === 'world' ? (
+          <Globe2 className="h-4 w-4 text-enadia-primary" aria-hidden="true" />
+        ) : (
+          <MapPin className="h-4 w-4 text-enadia-primary" aria-hidden="true" />
+        )}
         <h2 className="text-base font-bold text-enadia-ink">Travel Map</h2>
-        <span className="ml-auto text-xs font-semibold text-enadia-muted">
-          {geoPhotos.length}地点 / {visitedPrefectureIds.length}都道府県
-        </span>
+
+        <div className="ml-auto flex rounded-full border border-enadia-line p-0.5">
+          {modeButtons.map((button) => (
+            <button
+              className={clsx(
+                'rounded-full px-3 py-1 text-xs font-bold transition',
+                activeMode === button.id ? 'bg-enadia-ink text-white' : 'text-enadia-muted hover:bg-slate-50'
+              )}
+              key={button.id}
+              onClick={() => setMode(button.id)}
+              type="button"
+            >
+              {button.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-[linear-gradient(160deg,#eef7fb_0%,#f6fbfd_100%)] p-2">
-        <JapanMap
-          highlightedPrefectureIds={visitedPrefectureIds}
+      <p className="mb-2 text-xs font-semibold text-enadia-muted">
+        {geoPhotos.length}地点
+        {activeMode === 'japan'
+          ? ` / ${visitedPrefectureIds.length}都道府県`
+          : visitedCountryCodes.length > 0
+            ? ` / ${visitedCountryCodes.length}か国`
+            : ''}
+      </p>
+
+      {activeMode === 'japan' ? (
+        <PinchZoom>
+          <JapanMap
+            highlightedPrefectureIds={visitedPrefectureIds}
+            markers={markers}
+            onSelectMarker={onOpenPhoto}
+            showRoute
+          />
+        </PinchZoom>
+      ) : (
+        <WorldMapView
+          fitToMarkers
+          locations={geoPhotos}
           markers={markers}
-          onSelectMarker={setSelectedPhotoId}
-          selectedMarkerId={selectedPhoto?.id ?? null}
+          onSelectMarker={onOpenPhoto}
+          onVisitedCountries={setVisitedCountryCodes}
+          showCountryList
           showRoute
         />
-      </div>
+      )}
 
-      {selectedPhoto ? (
-        <div className="mt-3 rounded-lg bg-slate-50 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate font-bold text-enadia-ink">{selectedPhoto.placeName ?? '地点未設定'}</p>
-              <p className="mt-1 text-xs text-enadia-muted">
-                {getPrefectureName(selectedPhoto.prefectureId)}
-                {selectedPhoto.confidence !== null
-                  ? ` ・ 位置の確度 ${Math.round(selectedPhoto.confidence * 100)}%`
-                  : ''}
-              </p>
-            </div>
-            {onAddThemeFromPhoto ? (
-              <button
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-enadia-primary"
-                onClick={() => onAddThemeFromPhoto(selectedPhoto)}
-                type="button"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                テーマへ
-              </button>
-            ) : null}
-          </div>
-          {selectedPhoto.suggestedThemes?.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {selectedPhoto.suggestedThemes.map((theme) => (
-                <span className="rounded-full bg-white px-2 py-1 text-[11px] font-bold text-enadia-muted" key={theme.theme}>
-                  {theme.label} {theme.confidence}%
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
+      {onOpenPhoto ? (
+        <p className="mt-2 text-xs text-enadia-muted">番号のついた地点をタップすると、その写真を開けます。</p>
+      ) : null}
+
+      {activeMode === 'japan' && hasOverseasPhoto ? (
+        <p className="mt-2 text-xs text-enadia-muted">
+          日本の外で撮った写真は日本地図に表示できません。「海外」に切り替えると見られます。
+        </p>
       ) : null}
     </section>
   );
