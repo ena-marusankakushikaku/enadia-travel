@@ -29,6 +29,8 @@ export function mapConquestEntryRow(row: ConquestEntryRow): ConquestEntry {
     lat: row.lat,
     lng: row.lng,
     source: row.source,
+    spotId: row.spot_id,
+    verification: row.verification,
     metadata: (row.metadata as Record<string, unknown> | null) ?? {}
   };
 }

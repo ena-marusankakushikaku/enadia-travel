@@ -10,8 +10,9 @@ import { mapConquestEntryRow } from '@/lib/api/conquestEntries';
 import { attachPhotoImageUrls, mapPhotoRow, PHOTO_SELECT_COLUMNS } from '@/lib/api/photos';
 import { mapProfileRow } from '@/lib/api/profiles';
 import { collectEntryLocations } from '@/lib/conquest/progress';
+import { mapSponsorRow, mapThemeSpotRow, mapThemeTemplateRow } from '@/lib/api/themeTemplates';
 import { collectVisitedCountryCodes } from '@/constants/world';
-import type { UserProfile } from '@/types/app';
+import type { Sponsor, ThemeSpot, ThemeTemplate, UserProfile } from '@/types/app';
 
 type ConquestDetailPageProps = {
   params: { conquestId: string };
@@ -65,12 +66,42 @@ export default async function ConquestDetailPage({ params }: ConquestDetailPageP
     (code) => code !== 'JP'
   ).length;
 
+  // 配布テーマ（template_id がある）なら、進み具合をスポット単位で出すために原本を読む
+  let template: ThemeTemplate | null = null;
+  let spots: ThemeSpot[] = [];
+  let sponsor: Sponsor | null = null;
+
+  if (project.templateId) {
+    const { data: templateRow } = await supabase
+      .from('theme_templates')
+      .select('*')
+      .eq('id', project.templateId)
+      .maybeSingle();
+
+    if (templateRow) {
+      template = mapThemeTemplateRow(templateRow);
+
+      const [{ data: spotRows }, { data: sponsorRow }] = await Promise.all([
+        supabase.from('theme_spots').select('*').eq('template_id', template.id).order('order_no'),
+        template.sponsorId
+          ? supabase.from('sponsors').select('*').eq('id', template.sponsorId).maybeSingle()
+          : Promise.resolve({ data: null })
+      ]);
+
+      spots = (spotRows ?? []).map(mapThemeSpotRow);
+      sponsor = sponsorRow ? mapSponsorRow(sponsorRow) : null;
+    }
+  }
+
   return (
     <AppShell subtitle="制覇詳細" title={project.name}>
       <ConquestDetail
         overseasCountryCount={overseasCountryCount}
         photos={photos}
         project={project}
+        sponsor={sponsor}
+        spots={spots}
+        template={template}
         userId={user.id}
         users={[currentUser]}
       />

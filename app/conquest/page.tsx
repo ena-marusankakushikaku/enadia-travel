@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/common/AppShell';
 import { ConquestPageClient } from '@/app/conquest/ConquestPageClient';
@@ -46,6 +47,20 @@ export default async function ConquestPage() {
 
   return (
     <AppShell subtitle="テーマごとの制覇" title="制覇">
+      {/* 「みんなのテーマ」は右上の小さなボタンでは見つけてもらえなかったので、
+          本文の先頭にタブとして置く。ここがスポンサードテーマへの主要な入口になる */}
+      <div className="mb-4 flex gap-2">
+        <span className="rounded-full bg-enadia-primary px-3.5 py-1.5 text-xs font-bold text-white">
+          マイテーマ
+        </span>
+        <Link
+          className="rounded-full border border-enadia-line bg-white px-3.5 py-1.5 text-xs font-bold text-enadia-muted transition hover:bg-slate-50"
+          href="/conquest/discover"
+        >
+          みんなのテーマ
+        </Link>
+      </div>
+
       <ConquestPageClient
         entries={entries}
         overseasCountryCountByProject={overseasCountryCountByProject}

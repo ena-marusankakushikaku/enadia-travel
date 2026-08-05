@@ -13,6 +13,10 @@ export function mapConquestProjectRow(row: ConquestProjectRow): ConquestProject 
     description: row.description,
     category: row.category as ConquestThemeCategory,
     isPublic: row.is_public,
+    templateId: row.template_id,
+    joinedAt: row.joined_at,
+    completedAt: row.completed_at,
+    archivedAt: row.archived_at,
     entries: []
   };
 }

@@ -10,6 +10,8 @@ import { mapTripMemberRow } from '@/lib/api/tripMembers';
 import { createSignedPhotoUrls } from '@/lib/api/photos';
 import { mapProfileRow } from '@/lib/api/profiles';
 import { touchLoginStreak } from '@/lib/api/loginStreak';
+import { loadThemeHighlights } from '@/lib/themes/highlights';
+import { ThemeHighlights } from '@/components/themes/ThemeHighlights';
 
 export default async function TripsPage() {
   const supabase = createSupabaseServerClient();
@@ -22,14 +24,21 @@ export default async function TripsPage() {
   // 一覧に必要なのは「旅ごとの枚数」と「表紙1枚」だけ。
   // 以前は写真の全項目を取ってすべての表示URLを発行していたため、
   // 写真が増えるほど画面が出るまで待たされる作りになっていた。
-  const [{ data: tripRows }, { data: memberRows }, { data: photoRows }, { data: ownProfileRow }] = await Promise.all([
+  const [
+    { data: tripRows },
+    { data: memberRows },
+    { data: photoRows },
+    { data: ownProfileRow },
+    themeHighlights
+  ] = await Promise.all([
     supabase.from('trips').select('*').order('created_at', { ascending: false }),
     supabase.from('trip_members').select('*'),
     supabase
       .from('photos')
       .select('id, trip_id, storage_path, thumbnail_path, captured_at, created_at')
       .order('created_at', { ascending: false }),
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+    loadThemeHighlights(supabase, user.id)
   ]);
 
   const trips = (tripRows ?? []).map((row) =>
@@ -107,6 +116,8 @@ export default async function TripsPage() {
           </Link>
         </div>
       </section>
+
+      <ThemeHighlights available={themeHighlights.available} joined={themeHighlights.joined} />
 
       {currentUser.plan === 'free' ? (
         <section className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

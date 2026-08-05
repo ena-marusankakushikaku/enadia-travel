@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/db';
 
-const protectedPrefixes = ['/trips', '/profile', '/conquest', '/travel-log'];
+const protectedPrefixes = ['/trips', '/profile', '/conquest', '/travel-log', '/admin'];
 
 export async function middleware(request: NextRequest) {
   const shouldProtect = protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix));
@@ -62,5 +62,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/trips/:path*', '/profile/:path*', '/conquest/:path*', '/travel-log/:path*']
+  matcher: ['/trips/:path*', '/profile/:path*', '/conquest/:path*', '/travel-log/:path*', '/admin/:path*']
 };

@@ -1,4 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
+import type { LegalDocStatus, LegalDocType, SpotVerification, ThemeKind, ThemeStatus } from '@/types/db';
+
+export type { LegalDocStatus, LegalDocType, SpotVerification, ThemeKind, ThemeStatus };
 
 export type Plan = 'free' | 'pro' | 'premium' | 'admin';
 export type TripRole = 'owner' | 'editor' | 'viewer';
@@ -137,6 +140,14 @@ export type ConquestProject = {
   description: string | null;
   category: ConquestThemeCategory;
   isPublic: boolean;
+  /**
+   * NULL なら自作テーマ。非NULL なら配布テーマへの参加。
+   * 画面側で新規作成直後の仮の値を組み立てることがあるため任意にしてある（DBから読んだものには必ず入る）。
+   */
+  templateId?: string | null;
+  joinedAt?: string | null;
+  completedAt?: string | null;
+  archivedAt?: string | null;
   entries: ConquestEntry[];
 };
 
@@ -156,6 +167,9 @@ export type ConquestEntry = {
   lat?: number | null;
   lng?: number | null;
   source: ConquestEntrySource;
+  /** 配布テーマのスポットに紐づく記録のときだけ入る（DBから読んだものには必ず入る） */
+  spotId?: string | null;
+  verification?: SpotVerification;
   metadata: Record<string, unknown>;
 };
 
@@ -170,7 +184,12 @@ export type TourismEventType =
   | 'travel_log_viewed'
   | 'photo_commented'
   | 'conquest_project_created'
-  | 'route_completed';
+  | 'route_completed'
+  | 'theme_viewed'
+  | 'theme_joined'
+  | 'theme_left'
+  | 'spot_reached'
+  | 'theme_completed';
 
 export type TourismEvent = {
   id: string;
@@ -192,4 +211,120 @@ export type PhotoFeedItem = {
   trip: Trip;
   uploader: UserProfile;
   viewerRole: TripRole;
+};
+
+
+// ---------------------------------------------------------------
+// スポンサードテーマ（配布されるテーマ）
+// ---------------------------------------------------------------
+
+export type Sponsor = {
+  id: string;
+  name: string;
+  displayName: string;
+  logoUrl: string | null;
+  contactEmail: string | null;
+  note: string | null;
+  contractStartsOn: string | null;
+  contractEndsOn: string | null;
+};
+
+export type ThemeSpot = {
+  id: string;
+  templateId: string;
+  name: string;
+  description: string | null;
+  address: string | null;
+  prefectureId: number | null;
+  lat: number;
+  lng: number;
+  radiusM: number;
+  orderNo: number;
+  imageUrl: string | null;
+  externalUrl: string | null;
+};
+
+export type ThemeTemplate = {
+  id: string;
+  title: string;
+  description: string | null;
+  emoji: string;
+  color: string;
+  category: ConquestThemeCategory;
+  kind: ThemeKind;
+  sponsorId: string | null;
+  /** true のとき PR バッジを必ず表示する（景品表示法のステマ規制対応） */
+  isSponsored: boolean;
+  areaLabel: string | null;
+  coverImageUrl: string | null;
+  rewardText: string | null;
+  termsUrl: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  status: ThemeStatus;
+  publishedAt: string | null;
+  createdAt: string;
+};
+
+/** 発見画面・詳細画面で使う、テーマと付随情報をまとめたもの */
+export type ThemeTemplateDetail = ThemeTemplate & {
+  sponsor: Sponsor | null;
+  spots: ThemeSpot[];
+  /** ログイン中のユーザーが参加してできた conquest_project の id */
+  joinedProjectId: string | null;
+};
+
+// ---------------------------------------------------------------
+// 規約・設定・会員ランク
+// ---------------------------------------------------------------
+
+export type LegalDocument = {
+  id: string;
+  docType: LegalDocType;
+  version: string;
+  title: string;
+  body: string;
+  summary: string | null;
+  status: LegalDocStatus;
+  requiresReconsent: boolean;
+  publishedAt: string | null;
+  effectiveOn: string | null;
+  updatedAt: string;
+};
+
+export type AppSettingKey =
+  | 'free_theme_limit'
+  | 'free_theme_unlimited_days'
+  | 'free_taste_insight_months'
+  | 'free_taste_insight_top_n'
+  | 'free_export_per_month'
+  | 'spot_default_radius_m'
+  | 'report_min_group_size';
+
+export type AppSettings = Record<AppSettingKey, number>;
+
+export type AppSettingRow = {
+  key: AppSettingKey;
+  value: number;
+  label: string;
+  description: string | null;
+  updatedAt: string;
+};
+
+export type MembershipRankId =
+  | 'start'
+  | 'novice'
+  | 'traveler'
+  | 'master'
+  | 'global'
+  | 'legend';
+
+export type MembershipRank = {
+  id: MembershipRankId;
+  name: string;
+  emoji: string;
+  /** 次のランクに届くまでの説明。最上位なら null */
+  nextHint: string | null;
+  /** 次のランクまでの進み具合（0〜1）。最上位なら 1 */
+  progress: number;
 };
